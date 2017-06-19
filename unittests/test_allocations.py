@@ -11,7 +11,7 @@ from customobjects.helper_objects import Cost, CostCentre, Employee
 from management_accounting import allocations
 
 TEST_PERIOD_YEAR = 2017
-TEST_PERIOD_MONTH = 5
+TEST_PERIOD_MONTH = 3
 
 class Test_EventMatching(unittest.TestCase):
     ''' Unit tests for the DataImport.EventMatching.py module '''
@@ -81,7 +81,7 @@ class Test_EventMatching(unittest.TestCase):
         for cc in total_nodes.keys():
             total_node_costs += sum([cost.amount for cost in total_nodes[cc]])
 
-        self.assertEqual(total_node_costs, total_costcentre_costs)
+        self.assertAlmostEqual(total_node_costs, total_costcentre_costs,places=6)
 
     def test_get_allocation_percentages_for_hierarchy_level_sums_to_one(self):
         '''

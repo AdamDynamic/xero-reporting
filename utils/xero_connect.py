@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-Purpose of this module is to extract Xero data
+Purpose of this module is to extract Xero data via the API and import it into the reporting database
 '''
 
 import datetime
@@ -12,10 +12,11 @@ from sqlalchemy.sql import func
 from xero import Xero
 from xero.auth import PrivateCredentials
 
+from customobjects.database_objects import TableXeroExtract
 import references as r
-import references_private
-from customobjects.database_objects import TableXeroExtract, TablePeriods
+import references_private as rp
 from utils.db_connect import db_sessionmaker
+import utils.misc_functions
 
 
 def get_xero_instance():
@@ -23,10 +24,10 @@ def get_xero_instance():
 
     :return: xero instance
     '''
-    with open(references_private.PRIVATE_KEY_LOCATION) as keyfile:
+    with open(rp.PRIVATE_KEY_LOCATION) as keyfile:
         rsa_key = keyfile.read()
 
-    credentials = PrivateCredentials(consumer_key=references_private.CONSUMER_KEY, rsa_key=rsa_key)
+    credentials = PrivateCredentials(consumer_key=rp.CONSUMER_KEY, rsa_key=rsa_key)
     xero = Xero(credentials)
 
     return xero
@@ -47,9 +48,8 @@ def get_to_from_date_range(year=None, month=None):
     :return: datetime objects of the first and last day of the month for that year
     '''
     # Check that parameters are in a sensible range
-    # ToDo: Refactor this to the references module
-    assert(year in [2014,2015,2016,2017,2018,2019,2020]), "year variable must be in the relevant range"
-    assert(month in [1,2,3,4,5,6,7,8,9,10,11,12]), "month variable must be a valid month of the year"
+    assert(year in r.AVAILABLE_PERIODS_YEARS), "year variable must be in the relevant range: {}".format(r.AVAILABLE_PERIODS_YEARS)
+    assert(month in r.AVAILABLE_PERIODS_MONTHS), "month variable must be a valid month of the year: {}".format(r.AVAILABLE_PERIODS_MONTHS)
 
     from_date = datetime.datetime(year=year, month=month, day=1)
     to_date = None
@@ -65,6 +65,7 @@ def json_serial(obj):
     ''' JSON serialiser for objects not serialisable by default JSON code
 
     (From stackoverflow solution "how to overcome 'datetime.datetime not JSON serializable' in python?)
+    https://stackoverflow.com/questions/11875770/how-to-overcome-datetime-datetime-not-json-serializable-in-python
 
     :param obj:
     :return:
@@ -95,7 +96,7 @@ def get_xero_profit_and_loss_data(year=None, month=None):
         params={
             'fromDate': from_date,
             'toDate': to_date,
-            'trackingCategoryID': r.CC_XERO_MAPPING_ID,
+            'trackingCategoryID': rp.CC_XERO_MAPPING_ID,
         },
     )
     return xero_data[0]
@@ -114,20 +115,6 @@ def get_list_of_cost_centres(xero_data):
                     list_of_cost_centres.append(cost_centre)
     return list_of_cost_centres
 
-def check_reporting_period_is_locked(year=None, month=None):
-    '''
-
-    :param year:
-    :param month:
-    :return:
-    '''
-
-    session = db_sessionmaker()
-    period_to_check = datetime.datetime(year=year, month=month,day=1)
-    period_query = session.query(TablePeriods).filter(TablePeriods.Period==period_to_check).one()
-    session.close
-    return period_query.IsLocked
-
 def check_unassigned_costcentres_is_nil(year=None, month=None):
     '''
 
@@ -136,38 +123,19 @@ def check_unassigned_costcentres_is_nil(year=None, month=None):
     :return:
     '''
     # ToDo: Refactor to capture instance where 'unassigned' cost centre across different GLs nets to zero
+    # ToDo: Refactor so that only costs are included in allocations (join to allocations table?)
     session = db_sessionmaker()
     date_to_check = datetime.datetime(year=year, month=month, day=1)
     total_unassigned = session.query(func.sum(TableXeroExtract.Value))\
-        .filter(TableXeroExtract.CostCentreName=='Unassigned')\
+        .filter(TableXeroExtract.CostCentreName==rp.XERO_UNASSIGNED_CC)\
         .filter(TableXeroExtract.Period==date_to_check)\
         .all()
     session.close()
 
-    return (total_unassigned[0][0] == 0) or (total_unassigned[0][0] == None)
+    return (abs(total_unassigned[0][0])<r.ALLOCATIONS_MAX_ERROR) or (total_unassigned[0][0] == None)
 
-def delete_old_xero_data(year=None, month=None):
-    ''' Deletes existing xero data from the tbl_DATA_xeroextract table
-
-    :param year: The year of the period to be deleted
-    :param month: The month of the period to be deleted
-    :return:
-    '''
-
-    session = db_sessionmaker()
-    period_to_delete = datetime.datetime(year=year, month=month,day=1)
-
-    period_is_locked = check_reporting_period_is_locked(year=year, month=month)
-
-    if not period_is_locked:
-        session.query(TableXeroExtract).filter(TableXeroExtract.Period==period_to_delete).delete()
-        session.commit()
-        session.close()
-    else:
-        raise ValueError("Period {}.{} is locked in table {}".format(year, month, r.TBL_MASTER_PERIODS))
-
-def parse_xero_body_data(xero_data, list_of_cost_centres, year, month):
-    '''
+def parse_xero_pnl_body_data(xero_data, list_of_cost_centres, year, month):
+    ''' Parses the Profit & Loss (split by Cost Centre) report and imports into the database
 
     :param xero_data:
     :param list_of_cost_centres:
@@ -209,40 +177,28 @@ def parse_xero_body_data(xero_data, list_of_cost_centres, year, month):
 
     return list_of_database_rows
 
-def pull_xero_data_to_database(year=None, month=None):
-    ''' Pulls the xero data via the API and imports it into the management reporting database
+def pull_xero_data_to_database(year, month):
+    ''' Pulls data via the Xero API and imports it into the database
 
+    :param year:
+    :param month:
     :return:
     '''
 
+    utils.misc_functions.check_period_exists(year=year, month=month)
+    utils.misc_functions.check_period_is_locked(year=year, month=month)
     xero_data = get_xero_profit_and_loss_data(year=year, month=month)
     list_of_costcentres = get_list_of_cost_centres(xero_data=xero_data)
 
-    session = db_sessionmaker()
-
     try:
-        data_rows = parse_xero_body_data(xero_data=xero_data, list_of_cost_centres=list_of_costcentres, year=year, month=month)
+        session = db_sessionmaker()
+        data_rows = parse_xero_pnl_body_data(xero_data=xero_data, list_of_cost_centres=list_of_costcentres, year=year, month=month)
+
+        utils.misc_functions.delete_table_data_for_period(table=TableXeroExtract, year=year, month=month)
+
         for data_row in data_rows:
             if data_row.Value != 0:
                 session.add(data_row)
-
-        delete_old_xero_data(year=year, month=month)
         session.commit()
     finally:
         session.close()
-
-
-    # Performed last to preserve the data in the case of errors in the above process
-    # ToDo: Include warning/check to user on execution that this will be done
-    #delete_old_xero_data(year=year, month=month)
-
-    # Create database objects for each row and import into the database
-
-    # Once all database objects have been added to the session, add to database
-
-
-#pull_xero_data_to_database(year=2017, month=3)
-#delete_old_xero_data(year=2017, month=5)
-
-#print check_unassigned_costcentres_is_nil(year=2017, month=5)
-

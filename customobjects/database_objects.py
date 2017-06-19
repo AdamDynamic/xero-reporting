@@ -6,7 +6,7 @@ Contains the database table objects created to support the SQLAlchemy ORM mappin
 database is represented by a mapping object here.
 '''
 
-from sqlalchemy import Column, Integer, Float, String, DateTime,  Boolean, ForeignKey
+from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 
 import references as r
@@ -44,7 +44,7 @@ class TableXeroExtract(Base):
                                      self.CompanyName,
                                      self.CostCentreName,
                                      self.AccountCode,
-                                     self.AccountCode,
+                                     self.AccountName,
                                      self.Period,
                                      self.Value)
 
@@ -102,11 +102,29 @@ class TableProfitAndLoss(Base):
     __tablename__ = r.TBL_DATA_PROFITANDLOSS
 
     ID = Column(Integer, primary_key=True)
+    TimeStamp = Column(DateTime)
     CompanyCode = Column(Integer, ForeignKey(r.TBL_MASTER_COMPANIES + "." + r.COL_COMPANIES_CLEARMATICSCODE))
     CostCentreCode = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES + "." + r.COL_CC_CLEARMATICSCODE))
     Period = Column(DateTime)
     AccountCode = Column(Integer)   # ToDo: Create chart of accounts and map foreign key
     Value = Column(Float)
+
+    def __repr__(self):
+        return "<" \
+               "ID: {}, " \
+               "TimeStamp: {}, " \
+               "CompanyCode: {}, " \
+               "CostCentreCode: {}, " \
+               "Period: {}, " \
+               "AccountCode: {}, " \
+               "Value: {}, " \
+               ">".format(self.ID,
+                          self.TimeStamp,
+                          self.CompanyCode,
+                          self.CostCentreCode,
+                          self.Period,
+                          self.AccountCode,
+                          self.Value)
 
 
 class TableHeadcount(Base):
@@ -133,12 +151,16 @@ class TableChartOfAccounts(Base):
 
     __tablename__ = r.TBL_MASTER_CHARTOFACCOUNTS
 
-    ClearmaticsCode = Column(Integer, primary_key=True)
+    ID = Column(Integer, primary_key=True)
+    ClearmaticsCode = Column(Integer)
     ClearmaticsName = Column(String)
     XeroCode = Column(String)
     XeroName = Column(String)
+    L0Code = Column(String)
+    L0Name = Column(String)
     L1Code = Column(String)
     L1Name = Column(String)
+    XeroMultiplier = Column(Integer)
 
 
 class TableAllocationAccounts(Base):
@@ -151,6 +173,11 @@ class TableAllocationAccounts(Base):
     ClearmaticsCode = Column(Integer, primary_key=True)
     ClearmaticsName = Column(String)
     L1Hierarchy = Column(String)
+    L0Code = Column(String)
+    L0Name = Column(String)
+    L1Code = Column(String)
+    L1Name = Column(String)
+
 
 class TableAllocationsData(Base):
     '''
@@ -169,5 +196,32 @@ class TableAllocationsData(Base):
     GLAccount = Column(Integer)
     CostHierarchy = Column(Integer)
     Value = Column(Float)
+
+
+class TableConsolidatedIncomeStatement(Base):
+    '''
+    SQLAlchemt ORM class for the tbl_OUTPUT_consolidated_is tabe
+    '''
+
+    __tablename__ = r.TBL_OUTPUT_CONSOL_IS
+
+    ID = Column(Integer, primary_key=True)
+    Period = Column(DateTime)
+    CompanyCode = Column(Integer)
+    CompanyName = Column(String)
+    PartnerCompanyCode = Column(Integer, nullable=True)
+    PartnerCompanyName = Column(String, nullable=True)
+    CostCentreCode = Column(String)
+    CostCentreName = Column(String)
+    PartnerCostCentreCode = Column(String, nullable=True)
+    PartnerCostCentreName = Column(String, nullable=True)
+    FinancialStatement = Column(String)
+    GLAccountCode = Column(Integer)
+    GLAccountName = Column(String)
+    L1HierarchyCode = Column(String)
+    L1HierarchyName = Column(String)
+    CostHierarchyNumber = Column(Integer)
+    Value = Column(Float)
+    TimeStamp = Column(DateTime)
 
 

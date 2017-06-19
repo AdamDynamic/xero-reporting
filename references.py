@@ -1,11 +1,19 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 '''
 Contains constants and other references used by the script
 '''
 
+### Time Constraints
+
+AVAILABLE_PERIODS_YEARS = [2017,2018,2019,2020] # ToDo: Align this with the periods in the database
+AVAILABLE_PERIODS_MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12]
+
 
 ### Financial Constants
 
-ALLOCATIONS_MAX_ERROR = 0.001
+ALLOCATIONS_MAX_ERROR = 0.0001
 
 ### Database Constants
 
@@ -31,3 +39,5 @@ COL_CHARTACC_XEROCODE = "XeroCode"
 TBL_MASTER_ALLOCACCOUNTS = "tbl_MASTER_allocationaccounts"
 
 TBL_DATA_ALLOCATIONS = "tbl_DATA_allocations"
+
+TBL_OUTPUT_CONSOL_IS = "tbl_OUTPUT_consolidated_is"

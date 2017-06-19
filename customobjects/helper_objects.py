@@ -1,12 +1,12 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 '''
 
 Contains user-defined objects used by the program
 
 '''
 
-from utils.db_connect import db_sessionmaker
-from utils.misc_functions import import_csv_to_dict
-import references as r
 
 class Employee(object):
 
@@ -86,49 +86,4 @@ class Cost(object):
                     self.counterparty_costcentre,
                     self.period,
                     self.amount)
-
-
-def get_all_employee_data():
-    ''' Retrieves all employee data from master data
-
-    :return: A list of Employee objects populated with meta-data
-    '''
-
-    # 1) Open CSV file and import data
-    hr_data = import_csv_to_dict(file_location=r.HR_CSV_FILE_LOCATION)
-
-    # 2) Produce list of Employee objects
-    list_of_employees = []
-    for employee in hr_data:
-        e = Employee()
-        e.id = employee[r.EMPLOYEE_ID]
-        e.first_name = employee[r.EMPLOYEE_FIRST_NAME]
-        e.last_name = employee[r.EMPLOYEE_LAST_NAME]
-        e.job_title = employee[r.EMPLOYEE_JOB_TITLE]
-        e.start_date = employee[r.EMPLOYEE_START_DATE]
-        e.salary = employee[r.EMPLOYEE_SALARY]
-        e.is_perm = employee[r.EMPLOYEE_PERM_FLAG]
-        e.cost_centre = employee[r.EMPLOYEE_COST_CENTRE]
-
-        list_of_employees.append(e)
-
-    return list_of_employees
-
-# def get_all_cost_centres():
-#
-#     # 1) Open CSV file and import data
-#     cc_data = import_csv_to_dict(file_location=r.CC_CSV_FILE_LOCATION)
-#
-#     # 2) Produce list of Cost Centre objects
-#     list_of_costcentres = []
-#
-#     for cc in cc_data:
-#         c = CostCentre()
-#         c.xero_name = cc[r.CC_XERO_NAME]
-#         c.xero_code = cc[r.CC_XERO_MAPPING]
-#         c.master_name = cc[r.CC_CLEARMATICS_MAPPING]
-#         c.is_support_function = cc[r.CC_IS_SUPPORT_FUNCTION]
-#         list_of_costcentres.append(c)
-
-
 

@@ -1,27 +1,27 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 '''
 Contains the functions used to generate indirect cost allocations
+
+Configuration assumes that indirect cost allocations are performed using headcount
 '''
 
 import datetime
 
-from helper_objects import CostCentre, Employee, Cost
 from sqlalchemy import or_
 
-import references as r
-import utils.xero_connect
-from customobjects.database_objects import TableXeroExtract, \
-    TableCompanies, \
-    TableCostCentres, \
+from customobjects.database_objects import TableCostCentres, \
     TableProfitAndLoss, \
     TableChartOfAccounts, \
     TableAllocationAccounts, \
     TableAllocationsData, \
     TableHeadcount
+from customobjects.helper_objects import CostCentre, Employee, Cost
+import references as r
 from utils.db_connect import db_sessionmaker
-from utils.misc_functions import get_datetime_of_last_day_of_month, check_period_is_locked
+import utils.misc_functions
 
-
-# Assumes that indirect cost allocations are performed using headcount
 
 def get_all_employees_from_database(year=None, month=None):
     '''
@@ -34,7 +34,7 @@ def get_all_employees_from_database(year=None, month=None):
     session = db_sessionmaker()
 
     # Period takes the headcount as of the last day of the month
-    period = get_datetime_of_last_day_of_month(year=year, month=month)
+    period = utils.misc_functions.get_datetime_of_last_day_of_month(year=year, month=month)
 
     qry_headcount = session.query(TableHeadcount)\
         .filter(TableHeadcount.StartDate <= period)\
@@ -100,6 +100,8 @@ def get_direct_costs_by_cc_by_node(year=None, month=None):
         .filter(TableProfitAndLoss.Period==period)\
         .all()
     session.close()
+    # ToDO: Insert check that all account codes in the P&L are correctly mapped in the Chart of Accounts
+    assert qry_costs != [], "Query in get_direct_costs_by_cc_by_node returned no results for period {}.{}".format(year, month)
 
     output_dict = {}
     # Get all cost centres in the extracted data
@@ -166,7 +168,7 @@ def get_allocation_percentages_for_hierarchy_level(costcentres = None, hierarchy
             receiving_dict[reciving_cc.master_code] = (reciving_cc.headcount() * 1.0)/total_receiving_headcount
         output_dict[sender_cc.master_code] = receiving_dict
 
-        assert sum([i for i in receiving_dict.values()])==1.0
+        assert abs(sum([i for i in receiving_dict.values()])-1.0)<0.000001
 
     return output_dict
 
@@ -279,26 +281,7 @@ def reallocate_previously_allocated_costs(sender_costcentres=None, receiving_cos
 
     return (sender_costcentres, receiving_costcentres)
 
-def delete_allocated_cost_data(year,month):
-    ''' Deletes the allocated cost data for a given period
-
-    :param year:
-    :param month:
-    :return:
-    '''
-    period_is_locked = check_period_is_locked(year=year, month=month)
-
-    if period_is_locked:
-        raise AttributeError("Period {}.{} is locked in table {}".format(year, month, r.TBL_MASTER_PERIODS))
-    else:
-        session = db_sessionmaker()
-        date_to_delete = datetime.datetime(year=year, month=month, day=1)
-        session.query(TableAllocationsData)\
-            .filter(TableAllocationsData.Period==date_to_delete).delete()
-        session.commit()
-        session.close()
-
-def upload_allocated_costs(costcentres=None):
+def upload_allocated_costs(costcentres):
     '''
 
     :param costcentres: Cost centre objects populated with direct costs and indirect cost allocations
@@ -336,6 +319,11 @@ def allocate_indirect_cost_for_period(year=None, month=None):
     :param month: The month of the period to run the allocation process on
     :return:
     '''
+
+    # Perform validation checks on the data before proceeding with processing
+    utils.misc_functions.check_period_exists(year=year, month=month)
+    utils.misc_functions.check_period_is_locked(year=year, month=month)
+    utils.misc_functions.check_table_has_records_for_period(year=year, month=month, table=TableProfitAndLoss)
 
     # Get a list of cost centres populated with headcount and costs per hierarchy level
     unprocessed_costcentres = get_populated_costcentres(year=year, month=month)
@@ -375,119 +363,6 @@ def allocate_indirect_cost_for_period(year=None, month=None):
         unprocessed_costcentres = receiving_costcentres[:]
 
     all_costcentres = processed_costcentres + unprocessed_costcentres
-    delete_allocated_cost_data(year=year, month=month)
+
+    utils.misc_functions.delete_table_data_for_period(table=TableAllocationsData, year=year, month=month)
     upload_allocated_costs(costcentres=all_costcentres)
-
-
-#allocate_indirect_cost_for_period(year=2017, month=5)
-#delete_allocated_cost_data(year=2017,month=5)
-
-
-
-
-### Maps the Xero extract to the Clearmatics master data mappings
-# ToDo: Refactor to different module
-
-def create_internal_profit_and_loss(year=None, month=None):
-    ''' Creates the master-data version of the profit and loss from the imported xero data
-
-    :param year:
-    :param month:
-    :return:
-    '''
-
-    # Check whether the period is locked
-    period_is_locked = utils.xero_connect.check_reporting_period_is_locked(year=year, month=month)
-    if not period_is_locked:
-        # Check whether the cost centre field has been populated for all line items in the xero data
-        cost_centres_populated = utils.xero_connect.check_unassigned_costcentres_is_nil(year=year, month=month)
-        if cost_centres_populated:
-
-            # ToDo: Include check that all cost centres have been mapped correctly
-
-            session = db_sessionmaker()
-            period_to_extract = datetime.datetime(year=year, month=month, day=1)
-
-            query = session.query(TableXeroExtract,  TableCompanies, TableCostCentres, TableChartOfAccounts)\
-                .filter(TableXeroExtract.CompanyName==TableCompanies.XeroName)\
-                .filter(TableXeroExtract.CostCentreName==TableCostCentres.XeroName)\
-                .filter(TableXeroExtract.AccountCode==TableChartOfAccounts.XeroCode)\
-                .filter(TableXeroExtract.Period==period_to_extract)\
-                .all()
-            if len(query)!=0:
-
-                for xero_data, company, costcentre, account in query:
-                    # ToDo: Group by cost centre to ensure that multiple lines that net to nil don't get populated?
-                    if xero_data.Value != 0:
-                        new_row = TableProfitAndLoss(
-                                                    CompanyCode = company.ClearmaticsCode,
-                                                    CostCentreCode = costcentre.ClearmaticsCode,
-                                                    Period = period_to_extract,
-                                                    AccountCode = account.ClearmaticsCode,
-                                                    Value = xero_data.Value
-                                                    )
-                        session.add(new_row)
-
-                session.commit()
-                session.close()
-
-            else:
-                raise AttributeError("No data returned from table {} for period {}.{}".format(r.TBL_DATA_XEROEXTRACT, year, month))
-        else:
-            raise ValueError("'Unasigned' cost centre in table {} does not sum to zero".format(r.TBL_DATA_XEROEXTRACT))
-    else:
-        raise ValueError("Period {}.{} is locked in table {}".format(year, month, r.TBL_MASTER_PERIODS))
-
-#create_internal_profit_and_loss(year=2017, month=5)
-
-
-# import the direct cost data
-# For cost centres marked as 'overheads/support', calculate the total cost
-# Allocation data should include where the data came from (so functions can see what's costing them money? vs. too much data)
-
-# 1) Import trial balance from Xero     Q: Does it include category data?
-# 2) Map to internal master data
-
-# 3) Run allocations of indirect costs
-# 4) Push transformed data to reporting table
-
-
-# How to run allocations
-
-# 1) Pull list of cost centres in the data (starting with the highest number, costs are allocated to all cost centres in higher levels)
-# Need to include a "L0" hierarchy for the P&L/Balance Sheet/etc?
-
-
-
-## Allocations Table
-
-# DateAllocationsRun
-# SendingCostCentre
-# ReceivingCostCentre
-# SendingCompany
-# ReceivingCompany
-# Period
-# GL Account
-# Amount
-
-
-# Q: How to split between companies?
-
-## GL Accounts
-
-# MarkUp (for transfer pricing)
-# Indirect - Staff
-# Indirect - Office
-# Indirect - Travel
-# Indirect - Consulting
-# Indirect - Depreciation & Amortisation
-# Indirect - Finance Charges
-# Indirect - Other
-
-# NodeCode
-# AllocationGLCode
-# AllocationGLName
-
-
-# Companies in 1000 range?
-# Cost Centres in 2000 range?
