@@ -26,15 +26,29 @@ class Employee(object):
 
         self.is_perm = None
 
-        # ToDo: Write __repr__ function
-
-
-class Company(object):
-
-    def __init__(self):
-
-        self.name = None
-        self.cost_centres = []
+    def __repr__(self):
+        return "<" \
+               "Employee: " \
+               "ID: {}, " \
+               "FirstName: {}, " \
+               "LastName: {}, " \
+               "JobTitle: {}, " \
+               "StartDate: {}, " \
+               "EndDate: {}, " \
+               "Salary: {}, " \
+               "CostCentre: {}, " \
+               "CompanyCode: {}, " \
+               "IsPerm: {}" \
+               ">".format(self.id,
+                          self.first_name,
+                          self.last_name,
+                          self.job_title,
+                          self.start_date,
+                          self.end_date,
+                          self.salary,
+                          self.cost_centre,
+                          self.company_code,
+                          self.is_perm)
 
 
 class CostCentre(object):
@@ -78,7 +92,15 @@ class Cost(object):
 
     def __repr__(self):
 
-        return "<Cost - Account Code: {}, Account Name: {}, Alloc Code: {}, Cost Hierarchy {}, Cpty CC Code: {}, Period: {}, Amount: {}>"\
+        return "<" \
+               "Cost - Account Code: {}," \
+               " Account Name: {}," \
+               " Alloc Code: {}," \
+               " Cost Hierarchy {}," \
+               " Cpty CC Code: {}," \
+               " Period: {}," \
+               " Amount: {}" \
+               ">"\
             .format(self.ledger_account_code,
                     self.ledger_account_name,
                     self.allocation_account_code,

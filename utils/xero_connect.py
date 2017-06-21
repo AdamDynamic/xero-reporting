@@ -185,6 +185,8 @@ def pull_xero_data_to_database(year, month):
     :return:
     '''
 
+    # ToDo: Insert check in instance where no Xero data exists for period
+
     utils.misc_functions.check_period_exists(year=year, month=month)
     utils.misc_functions.check_period_is_locked(year=year, month=month)
     xero_data = get_xero_profit_and_loss_data(year=year, month=month)

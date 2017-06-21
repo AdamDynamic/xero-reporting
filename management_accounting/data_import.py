@@ -173,5 +173,3 @@ def create_consolidated_income_statement(year, month):
 
     session.commit()
     session.close()
-
-#create_consolidated_income_statement(year=2017, month=5)

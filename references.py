@@ -7,8 +7,13 @@ Contains constants and other references used by the script
 
 ### Time Constraints
 
-AVAILABLE_PERIODS_YEARS = [2017,2018,2019,2020] # ToDo: Align this with the periods in the database
+# Simple checks used to validate input before making a database request to check whether the date is in the database
+AVAILABLE_PERIODS_YEARS = [2017,2018,2019,2020]
 AVAILABLE_PERIODS_MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12]
+
+### Master Data Mappings
+
+COMPANY_CODE_CLEARMATICS = 1000
 
 
 ### Financial Constants
@@ -35,6 +40,7 @@ COL_HEADCOUNT_COSTCENTRE = "CostCentre"
 
 TBL_MASTER_CHARTOFACCOUNTS = "tbl_MASTER_chartofaccounts"
 COL_CHARTACC_XEROCODE = "XeroCode"
+COL_CHARTACC_CLEARMATICSCODE = "ClearmaticsCode"
 
 TBL_MASTER_ALLOCACCOUNTS = "tbl_MASTER_allocationaccounts"
 

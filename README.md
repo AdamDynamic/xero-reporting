@@ -5,35 +5,45 @@ The purpose of this module is to generate a standardised set of company financia
 
 ## Command Line Interface
 
-The management reporting tool uses a command line interface to control the import, processing and output of financial data. The commands below are available for the `main.py` module. Note that the `--help` function works for all commands in the interface.
+The management reporting tool uses a command line interface to control the import, processing and output of financial data. The commands below are available for the `main.py` module.
 
-`get_xero_data`
+Note also that the `--help` function works for all commands in the interface.
 
-Retrieves financial data from the company Xero instance and imports it into the database
+### Creating Reporting Data
 
-`convert_xero_data`
+To create a valid dataset the commands below must be run *in order*. It is recommended that the output for each stage be checked before the next stage is processed:
 
-Re-maps the imported Xero reporting data to standardised internal company master data mappings. 
+1. `get_xero_data`
 
-`run_allocations`
+Retrieves financial data from the company Xero instance and imports it into the database. Options are `--year` and `--month` to set the period you want to pull into the database.
 
-Runs the cost allocation process on the direct costs of support functions.
+2. `convert_xero_data`
 
-`create_consolidated_table`
+Re-maps the imported Xero reporting data to standardised internal company master data mappings. Options are `--year` and `--month` to set the period you want to convert.
 
-Creates a user-readable Income Statement that combines both the Xero data (converted to Clearmatics master data mappings) and the allocated cost data. 
+3. `run_allocations`
 
-This is the final dataset that can be used for management reporting.
+Runs the cost allocation process on the direct costs of support functions. Options are `--year` and `--month` to set the period you want to run allocations on.
+
+4. `create_consolidated_table`
+
+Creates a user-readable Income Statement that combines both the Xero data (converted to Clearmatics master data mappings) and the allocated cost data. Options are `--year` and `--month` to set the period you want to create the consolidated table for.
+
+Once `get_xero_data`, `convert_xero_data`, `run_allocations` and `create_consolidated_table` have been run (*in that order*) then the data is ready to be reported on. See the `status` function below for user visibility on whether the process has been run correctly.
+
+### Other functions
 
 `set_period_lock`
 
-A period lock is enabled in the database to mitigate the risk that previously reported data is accidently changed. If a period is locked, commands that transform the data will return an error message.
+A period lock is enabled in the database to mitigate the risk that previously reported data is accidently changed. If a period is locked, commands that transform the data will return an error message. Options are `--year` and `--month` to set the period you want to lock/unlock and `--locked` (`=True` or `=False`) to change the locking status of the period.
 
-To make changes in a locked period, the period must first be unlocked by setting locked flag as False: `--locked=False`
+If a period is locked, then no other processes can be run on the period without first unlocking the period. 
 
 `status`
 
-Outputs a table to the console summarising which steps in the end-to-end process have been completed and whether the data in upstream processes is up to date. 
+Outputs a table to the console summarising which steps in the end-to-end process have been completed and whether the data in upstream processes is up to date. If the `TimeStampCheck` check shows anything other than `Pass` then some processes need to be re-run to ensure that the final dataset reflects the data held in Xero (check the error message for details).
+
+The purpose of this check is to mitigate the risk that one step in the process is changed but that the latest data isn't subsequently pulled into the final consolidated table.
 
 
 ## Cost Centre Hierarchy
@@ -59,7 +69,6 @@ Level 3 cost centres comprise of costs used by all other areas of the business. 
  - The company Slack subscription
 
 
-
 ## Allocations
 
 The operational costs of cost centres below Level 1 are allocated upwards sequentially, starting with the lowest level.
@@ -73,3 +82,11 @@ Level 2 allocates costs (both direct costs and indirect costs allocated to Level
 Level 1 does not allocate any of its direct or indirect costs. 
 
 *Costs are allocated based on the headcount of the receiving cost centres*. For example, if a L2 cost centre was allocating its costs to two L1 cost centres that had 3 and 7 heads respectively, the first L1 cost centre would receive 30% of the L2's costs, and the second L1 cost centre would receive the remaining 70%.
+
+## To-Do List
+
+The following items are still outstanding:
+
+1. Way of efficiently updating the headcount table to account for joiners/leavers
+2. A way of outputing the consolidated final table to a spreadsheet
+3. Extract, re-mapping and output of cashflow data from Xero

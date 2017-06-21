@@ -299,8 +299,8 @@ def upload_allocated_costs(costcentres):
                                         DateAllocationsRun = upload_time,
                                         SendingCostCentre = cost.counterparty_costcentre,
                                         ReceivingCostCentre = cc.master_code,
-                                        SendingCompany = 1000, # ToDo: Refactor to make this dynamic
-                                        ReceivingCompany = 1000, # ToDo: Refactor to make this dynamic
+                                        SendingCompany = r.COMPANY_CODE_CLEARMATICS, # ToDo: Refactor to make this dynamic
+                                        ReceivingCompany = r.COMPANY_CODE_CLEARMATICS, # ToDo: Refactor to make this dynamic
                                         Period = cost.period,
                                         GLAccount = cost.ledger_account_code,
                                         CostHierarchy = cost.cost_hierarchy,
@@ -311,7 +311,20 @@ def upload_allocated_costs(costcentres):
     session.commit()
     session.close()
 
-def allocate_indirect_cost_for_period(year=None, month=None):
+
+def allocate_indirec_cost_for_costcentre(costcentrecode, companycode, year, month):
+    # ToDo: Refactor allocate_indirect_cost_for_period to iterate over each company and each costcentre in each
+    # company to generate what will be "pre-intercompany process" balances
+    pass
+
+
+def allocate_indirect_cost_for_company(companycode, year, month):
+    # ToDo: Refactor allocate_indirect_cost_for_period to iterate over each company and each costcentre in each
+    # company to generate what will be "pre-intercompany process" balances
+    pass
+
+
+def allocate_indirect_cost_for_period(year, month):
     ''' Calculates the indirect cost allocations based on headcount for a given period and uploads the results
         to the management reporting database
 

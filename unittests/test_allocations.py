@@ -13,8 +13,8 @@ from management_accounting import allocations
 TEST_PERIOD_YEAR = 2017
 TEST_PERIOD_MONTH = 3
 
-class Test_EventMatching(unittest.TestCase):
-    ''' Unit tests for the DataImport.EventMatching.py module '''
+class Test_Allocations(unittest.TestCase):
+    ''' Unit tests for the management_accounting.allocations.py module '''
 
 
     def test_get_all_cost_centres_from_database_returns_cost_centre_objects(self):
@@ -97,7 +97,6 @@ class Test_EventMatching(unittest.TestCase):
             if level != 1:
                 test_allocation_percentages = allocations.get_allocation_percentages_for_hierarchy_level(costcentres=populated_costcentres,
                                                                                                  hierarchy_level_to_allocate=level)
-                print test_allocation_percentages
                 # Check that the allocation percentages sum to one
                 for cc_code in test_allocation_percentages.keys():
                     total_percentage = sum([perc for perc in test_allocation_percentages[cc_code].values()])
@@ -123,13 +122,6 @@ class Test_EventMatching(unittest.TestCase):
                             if cc.master_code==alloc_cc_code:
                                 self.assertLess(cc.hierarchy_tier,sender_hierarchy_level)
 
-
-
-
-
-        # Test sums to one
-        # Test cc doesn't allocate to itself
-        # Test that cc doesn't allocate to hierarchy on lower levels
 
     def test_allocate_dir_costs_for_tier(self):
 

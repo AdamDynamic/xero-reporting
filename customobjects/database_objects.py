@@ -106,7 +106,7 @@ class TableProfitAndLoss(Base):
     CompanyCode = Column(Integer, ForeignKey(r.TBL_MASTER_COMPANIES + "." + r.COL_COMPANIES_CLEARMATICSCODE))
     CostCentreCode = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES + "." + r.COL_CC_CLEARMATICSCODE))
     Period = Column(DateTime)
-    AccountCode = Column(Integer)   # ToDo: Create chart of accounts and map foreign key
+    AccountCode = Column(Integer, ForeignKey(r.TBL_MASTER_CHARTOFACCOUNTS + "." + r.COL_CHARTACC_CLEARMATICSCODE))
     Value = Column(Float)
 
     def __repr__(self):

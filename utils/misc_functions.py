@@ -12,31 +12,18 @@ import sqlalchemy
 import sqlalchemy.orm
 
 import references as r
-from customobjects.database_objects import TablePeriods, TableXeroExtract, TableChartOfAccounts
+from customobjects.database_objects import TablePeriods, TableXeroExtract, TableChartOfAccounts, TableConsolidatedIncomeStatement
 from customobjects import error_objects
 from utils.db_connect import db_sessionmaker
 
-#
-# def import_csv_to_dict(file_location):
-#     ''' Opens and imports a CSV file and outputs the data as a list of dictionaries
-#
-#     :param file_location: The relative location of the csv file to be imported
-#     :return: A list of dictionaries, one per row of the csv file
-#     '''
-#
-#     with open(file_location, 'rb') as f:
-#         reader = csv.DictReader(f)
-#         rows = list(reader)
-#         return rows
-
-def get_datetime_of_last_day_of_month(year=None, month=None):
+def get_datetime_of_last_day_of_month(year, month):
     ''' Returns a datetime object of the last day of the month
 
     :param year:
     :param month:
     :return:
     '''
-    # ToDo: Refactor and include in xero_connect module
+
     last_day = None
     if month == 12:
         last_day = datetime.datetime(year=year + 1, month=1, day=1)
@@ -145,7 +132,6 @@ def get_unmapped_account_codes():
     session.close()
     return unmapped_rows
 
-
 def delete_table_data_for_period(table, year, month):
     ''' Deletes all data in a given table object for a specific year and month
 
@@ -163,3 +149,30 @@ def delete_table_data_for_period(table, year, month):
     session.query(table).filter(table.Period==date_to_delete).delete()
     session.commit()
     session.close()
+
+def output_table_to_csv(table, file_location):
+    ''' Outputs a database table to a *.csv file, saved to a location specified by the user
+
+    :param table: The table object to be outputed
+    :param file_location: Where the user would like the *.csv file saved
+    :return:
+    '''
+
+    timestamp = datetime.datetime.now().strftime("yyyymmdd-hhmmss") # ToDo: Doesn't work
+
+    file_name = file_location + table.__name__ + timestamp + ".csv"  # ToDo: Check concatenation of /'s etc in filename
+    output_file = open(file_name, 'wb')
+    writer = csv.writer(output_file)
+
+    session = db_sessionmaker()
+    records = session.query(table).all()
+    print records
+    # ToDo: Need to write header row first
+    [writer.writerow([getattr(curr, column.name) for column in table.__mapper__.columns]) for curr in records]
+    session.close()
+    output_file.close()
+
+    # ToDo: Only create file if the process is run successfully end-to-end
+
+file_location = '/home/adam/Desktop/'
+output_table_to_csv(table=TableConsolidatedIncomeStatement, file_location=file_location)
