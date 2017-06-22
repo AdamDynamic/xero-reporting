@@ -7,6 +7,8 @@ Contains miscellaneous io operations not captured by the other modules
 
 import csv
 import datetime
+import errno
+import os
 
 import sqlalchemy
 import sqlalchemy.orm
@@ -150,29 +152,57 @@ def delete_table_data_for_period(table, year, month):
     session.commit()
     session.close()
 
-def output_table_to_csv(table, file_location):
-    ''' Outputs a database table to a *.csv file, saved to a location specified by the user
+def convert_dir_path_to_standard_format(folder_path):
+    ''' Standardises the folder path passed to the function
 
-    :param table: The table object to be outputed
-    :param file_location: Where the user would like the *.csv file saved
+    :param folder_path:
     :return:
     '''
 
-    timestamp = datetime.datetime.now().strftime("yyyymmdd-hhmmss") # ToDo: Doesn't work
+    if folder_path[-1] != "/":
+        folder_path += "/"
+    return folder_path
 
-    file_name = file_location + table.__name__ + timestamp + ".csv"  # ToDo: Check concatenation of /'s etc in filename
-    output_file = open(file_name, 'wb')
-    writer = csv.writer(output_file)
+def open_or_create_folder(dir_path):
+    ''' If a directory doesn't already exist, that folder is created
 
+    :param dir_path:
+    :return:
+    '''
+
+    try:
+        os.makedirs(dir_path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+
+def check_directory_exists(dir_path):
+
+    return os.path.isdir(dir_path)
+
+
+def output_table_to_csv(table, output_directory):
+    ''' Outputs a database table to a *.csv file, saved to a location specified by the user
+
+    :param table: The table object to be outputed
+    :param output_directory: Where the user would like the *.csv file saved
+    :return:
+    '''
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Create the default output directory if it doesn't already exist
+    output_directory = convert_dir_path_to_standard_format(folder_path=output_directory)
+    file_name = output_directory + table.__name__ + "_" + timestamp + ".csv"
+
+    # Get all records from the related table
     session = db_sessionmaker()
     records = session.query(table).all()
-    print records
-    # ToDo: Need to write header row first
-    [writer.writerow([getattr(curr, column.name) for column in table.__mapper__.columns]) for curr in records]
     session.close()
+
+    # Output the records to a csv file
+    output_file = open(file_name, 'wb')
+    writer = csv.writer(output_file)
+    writer.writerow(table.__table__.columns.keys())
+    [writer.writerow([getattr(curr, column.name) for column in table.__mapper__.columns]) for curr in records]
     output_file.close()
-
-    # ToDo: Only create file if the process is run successfully end-to-end
-
-file_location = '/home/adam/Desktop/'
-output_table_to_csv(table=TableConsolidatedIncomeStatement, file_location=file_location)

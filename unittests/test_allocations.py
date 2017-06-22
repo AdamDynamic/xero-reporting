@@ -122,7 +122,6 @@ class Test_Allocations(unittest.TestCase):
                             if cc.master_code==alloc_cc_code:
                                 self.assertLess(cc.hierarchy_tier,sender_hierarchy_level)
 
-
     def test_allocate_dir_costs_for_tier(self):
 
         alloc_perc = {'C000002': {'C000001': 1.0}, 'C000003': {'C000001': 1.0}}

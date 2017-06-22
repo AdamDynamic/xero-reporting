@@ -5,13 +5,15 @@
 Command Line Interface for the management reporting database and associated functions
 '''
 
+import os
 import requests
 
 import click
 
-from customobjects import error_objects
+from customobjects import error_objects, database_objects
 from management_accounting.allocations import allocate_indirect_cost_for_period
 from management_accounting.data_import import create_internal_profit_and_loss, create_consolidated_income_statement
+import references as r
 from utils.console_output import util_output, display_status_table
 import utils.misc_functions
 from utils.xero_connect import pull_xero_data_to_database
@@ -78,6 +80,7 @@ def convert_xero_data(year, month):
         util_output("ERROR: {}".format(e.message))
         util_output("ERROR: Conversion of Xero data is aborted")
 
+
 @fin_reporting.command(help="Runs indirect cost allocations")
 @click.option('--year', type=int, help="The year of the period to run allocations on")
 @click.option('--month', type=int, help="The month of the period to run allocations on")
@@ -108,7 +111,6 @@ def run_allocations(year, month):
         util_output("ERROR: Creation of cost allocations aborted")
 
 
-
 @fin_reporting.command(help="Creates the consolidated reporting table")
 @click.option('--year', type=int, help="The year of the period to create an output table for")
 @click.option('--month', type=int, help="The month of the period to create an output table for")
@@ -135,6 +137,7 @@ def create_consolidated_table(year,month):
     except error_objects.TableEmptyForPeriodError, e:
         util_output("ERROR: {}".format(e.message))
         util_output("ERROR: Creation of consolidated table aborted")
+
 
 @fin_reporting.command(help="Locks/unlocks a given period in the database")
 @click.option('--year', type=int, help="The year of the period in the database to lock")
@@ -176,6 +179,48 @@ def set_period_lock(year, month, locked):
                 util_output("Reporting period {}.{} is {}".format(year, month, ("LOCKED" if locked else "UNLOCKED")))
             else:
                 util_output("Locking process aborted for period {}.{}".format(year, month))
+
+
+@fin_reporting.command(help="Outputs the consolidated tables to csv")
+@click.option('--folder', default=r.DEFAULT_OUTPUT_FOLDERPATH, help="Folder location to output files to")
+def output_to_csv(folder):
+    ''' Outputs the consolidated income statement to a csv file to the file position specified by the user
+
+    :param folder:
+    :return:
+    '''
+
+    # If no folder is specified by the user, default to the current directory with default output directory
+    if folder == r.DEFAULT_OUTPUT_FOLDERPATH:
+
+        current_file_location = os.path.realpath(__file__)
+        current_dir_location = os.path.dirname(current_file_location)
+        output_dir = utils.misc_functions.convert_dir_path_to_standard_format(folder_path=current_dir_location)
+        output_dir += r.DEFAULT_OUTPUT_FOLDERNAME
+        folder = utils.misc_functions.convert_dir_path_to_standard_format(folder_path=output_dir)
+        utils.misc_functions.open_or_create_folder(folder)
+        util_output("Outputting table {} to default file location:\n{}..."
+                    .format(database_objects.TableConsolidatedIncomeStatement.__tablename__, folder))
+    else:
+
+        # Standardise the folder passed to the function by the user
+        folder = utils.misc_functions.convert_dir_path_to_standard_format(folder_path=folder)
+        folder += r.DEFAULT_OUTPUT_FOLDERNAME
+        folder = utils.misc_functions.convert_dir_path_to_standard_format(folder_path=folder)
+
+        util_output("Outputting table {} to user-specified file location:\n{}..."
+                    .format(database_objects.TableConsolidatedIncomeStatement.__tablename__, folder))
+
+    # If the inputted folder is correctly formatted and exists, output the table
+    if utils.misc_functions.check_directory_exists(folder):
+        utils.misc_functions.output_table_to_csv(table=database_objects.TableConsolidatedIncomeStatement,
+                                                 output_directory=folder)
+        util_output("Table output complete.")
+    else:
+        util_output("ERROR: Directory {} does not exist".format(folder))
+        util_output("ERROR: Output of table {} aborted".format(database_objects.
+                                                               TableConsolidatedIncomeStatement.__tablename__))
+
 
 @fin_reporting.command(help="Displays the current status of the reporting data in the database")
 def status():

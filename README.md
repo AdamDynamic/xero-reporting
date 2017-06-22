@@ -45,6 +45,12 @@ Outputs a table to the console summarising which steps in the end-to-end process
 
 The purpose of this check is to mitigate the risk that one step in the process is changed but that the latest data isn't subsequently pulled into the final consolidated table.
 
+`output_to_csv`
+
+Outputs a .csv file of the consolidated income statement to folder called `fin-data-output`. By default the file is created in the directory the `main.py` file resides in (in a sub-folder called `fin-data-output` which the script will create automatically if it doesn't already exist).
+
+The user can specify the output file using the `--folder=/user/specified/filepath/here` flag.
+
 
 ## Cost Centre Hierarchy
 
