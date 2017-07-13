@@ -192,7 +192,7 @@ def display_status_table():
                                                               pnl_date=pnl_timestamp,
                                                               alloc_date=alloc_timestamp,
                                                               consol_date=consol_timestamp)
-
+        # ToDo: Include "recalculate" requirement for instance where the TimeStampCheck shows an error
         table_row = [row.Period,
                       ('True' if row.IsLocked else 'False'),
                       ('Imported' if row.Period in xero_dates else 'Not Imported'),
@@ -220,6 +220,8 @@ def display_status_table():
         print "The following Balance Sheet nodes are unmapped for cash flow calculations:"
         for row in unmapped_cashflow_nodes:
             print " " + str(row)
+
+    # ToDo: Include output for instances where master data has uniqueness failures
 
     # Check whether any balance sheet nodes aren't captured by the cash flow calculations
     #unmapped_nodes = check_all_bs_nodes_mapped_for_cashflow()

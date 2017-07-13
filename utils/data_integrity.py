@@ -14,7 +14,6 @@ from customobjects import error_objects
 from customobjects.database_objects import TableChartOfAccounts, TableAllocationAccounts, TableCostCentres, \
     TableCompanies, TableNodeHierarchy, TablePeriods
 from utils.db_connect import db_sessionmaker
-import utils.misc_functions
 
 
 def confirm_table_column_is_unique(table_object, column_name):
@@ -37,9 +36,9 @@ def confirm_table_column_is_unique(table_object, column_name):
 
     return len(test_field) == len(list(set(test_field)))
 
-def master_data_integrity_check():
+def master_data_uniquesness_check():
     ''' Performs integrity checks on the master data in the table and raises an MasterDataIncompleteError if any
-        duplicate values are detected.
+        duplicate values are detected in fields where each record should be unique.
 
     :return:
     '''
@@ -67,6 +66,24 @@ def master_data_integrity_check():
     if not confirm_table_column_is_unique(TablePeriods, r.COL_PERIOD_PERIOD):
         raise error_objects.MasterDataIncompleteError("Table {} has duplicate values in column {}"
                                                       .format(TablePeriods.__tablename__, r.COL_PERIOD_PERIOD))
+
+def check_period_is_locked(year, month):
+    ''' Checks whether a period in the reporting database is locked for changes
+
+    :param year:
+    :param month:
+    :return: True/False depending on whether the period is locked or not
+    '''
+
+    check_period_exists(year=year, month=month)
+    session = db_sessionmaker()
+    date_to_check = datetime.datetime(year=year, month=month, day=1)
+    lock_check = session.query(TablePeriods).filter(TablePeriods.Period==date_to_check).one()
+    session.close()
+    if lock_check.IsLocked:
+        raise error_objects.PeriodIsLockedError("Period {}.{} is LOCKED in table {}".format(year, month, TablePeriods.__tablename__))
+    else:
+        return True
 
 def check_period_exists(year, month):
     ''' Checks that the period is included in the database
@@ -109,6 +126,17 @@ def check_directory_exists(dir_path):
 
     return os.path.isdir(dir_path)
 
+def balance_sheet_balances_check(year, month):
+    ''' Checks whether the Balance Sheet nets to zero in the re-mapped financial data
+
+    :param year:
+    :param month:
+    :return:
+    '''
+    raise NotImplementedError()
+    return False
+
+
 def master_data_integrity_check(year, month):
     ''' Performs a series of tests on the data to determine whether processes that depend on data integrity will work correctly
 
@@ -117,6 +145,10 @@ def master_data_integrity_check(year, month):
     :return:
     '''
 
-    master_data_integrity_check()
+    # ToDo: Enforce timestamp check on previous periods to ensure that re-mapped data is aligned with Xero data
+
+    master_data_uniquesness_check()
     check_period_exists(year=year, month=month)
-    utils.misc_functions.check_period_is_locked(year=year, month=month)
+    check_period_is_locked(year=year, month=month)
+
+

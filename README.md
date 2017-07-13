@@ -104,4 +104,5 @@ The following items are still outstanding:
 
 1. Way of efficiently updating the headcount table to account for joiners/leavers
 2. Unit testing for `cashflow_calcs.py` module.
+3. Include descriptions of the tables in the README file.
 

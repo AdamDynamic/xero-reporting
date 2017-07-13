@@ -15,7 +15,7 @@ from customobjects.database_objects import \
     TablePeriods, \
     TableXeroExtract, \
     TableChartOfAccounts
-from utils.data_integrity import check_period_exists
+from utils.data_integrity import check_period_exists, check_period_is_locked
 from utils.db_connect import db_sessionmaker
 
 
@@ -34,24 +34,6 @@ def get_datetime_of_last_day_of_month(year, month):
         last_day = datetime.datetime(year=year, month=month + 1, day=1)
     last_day = last_day + datetime.timedelta(days=-1)
     return last_day
-
-def check_period_is_locked(year, month):
-    ''' Checks whether a period in the reporting database is locked for changes
-
-    :param year:
-    :param month:
-    :return: True/False depending on whether the period is locked or not
-    '''
-
-    check_period_exists(year=year, month=month)
-    session = db_sessionmaker()
-    date_to_check = datetime.datetime(year=year, month=month, day=1)
-    lock_check = session.query(TablePeriods).filter(TablePeriods.Period==date_to_check).one()
-    session.close()
-    if lock_check.IsLocked:
-        raise error_objects.PeriodIsLockedError("Period {}.{} is LOCKED in table {}".format(year, month, TablePeriods.__tablename__))
-    else:
-        return True
 
 def check_table_has_records_for_period(year,month,table):
     ''' Checks whether a table contains a non-zero number of records for a given period
