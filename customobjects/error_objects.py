@@ -28,3 +28,19 @@ class TableEmptyForPeriodError(AttributeError):
     '''
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
+
+
+class UnallocatedCostsNotNilError(AttributeError):
+    '''
+    Customer error class raised when a given table doesn't contain any records for a given period
+    '''
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
+
+class MasterDataIncompleteError(AttributeError):
+    '''
+    Customer error class raised when a given table doesn't contain any records for a given period
+    '''
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)

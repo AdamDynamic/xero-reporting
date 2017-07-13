@@ -8,11 +8,12 @@ Purpose of this module is to extract Xero data via the API and import it into th
 import datetime
 import pprint
 
-from sqlalchemy.sql import func
 from xero import Xero
 from xero.auth import PrivateCredentials
 
-from customobjects.database_objects import TableXeroExtract
+import utils.data_integrity
+from customobjects.database_objects import TableXeroExtract, TableAllocationAccounts, TableChartOfAccounts
+import customobjects.error_objects
 import references as r
 import references_private as rp
 from utils.db_connect import db_sessionmaker
@@ -40,7 +41,7 @@ def print_tracking_categories():
     xero = get_xero_instance()
     pprint.pprint(xero.trackingcategories.all())
 
-def get_to_from_date_range(year=None, month=None):
+def get_to_from_date_range(year, month):
     ''' Calculates the to and from dates for each reporting period, taking into account leap years, months of different lengths, etc
 
     :param year:
@@ -61,21 +62,7 @@ def get_to_from_date_range(year=None, month=None):
 
     return from_date, to_date
 
-def json_serial(obj):
-    ''' JSON serialiser for objects not serialisable by default JSON code
-
-    (From stackoverflow solution "how to overcome 'datetime.datetime not JSON serializable' in python?)
-    https://stackoverflow.com/questions/11875770/how-to-overcome-datetime-datetime-not-json-serializable-in-python
-
-    :param obj:
-    :return:
-    '''
-    if isinstance(obj, datetime.datetime):
-        serial = obj.isoformat()
-        return serial
-    raise TypeError("Type is not serialisable")
-
-def get_xero_profit_and_loss_data(year=None, month=None):
+def get_xero_profit_and_loss_data(year, month):
     ''' Retrieves Profit & Loss data from Xero for a specific period
 
     :param year:
@@ -101,6 +88,31 @@ def get_xero_profit_and_loss_data(year=None, month=None):
     )
     return xero_data[0]
 
+def get_xero_balancesheet_data(year, month):
+    ''' Retrieves Balance Sheet data from Xero for a specific period
+
+    :param year:
+    :param month:
+    :return: A JSON object containing the Balance Sheet
+    '''
+
+    xero = get_xero_instance()
+
+    # Define the to- and from-dates in the YYYY-MM-DD format required by the xero api
+    from_date, to_date = get_to_from_date_range(year=year, month=month)
+    from_date.strftime('%Y-%m-%d')
+    to_date.strftime('%Y-%m-%d')
+
+    # Retrieve the data from xero
+    xero_data = xero.reports.get(
+        'BalanceSheet',
+        params={
+            'date': to_date,    # Only use to_date in order to capture the balance on the last day of the period
+        },
+    )
+
+    return xero_data[0]
+
 def get_list_of_cost_centres(xero_data):
     ''' Returns an ordered list of cost centres in the data
 
@@ -115,24 +127,33 @@ def get_list_of_cost_centres(xero_data):
                     list_of_cost_centres.append(cost_centre)
     return list_of_cost_centres
 
-def check_unassigned_costcentres_is_nil(year=None, month=None):
-    '''
+def check_unassigned_costcentres_is_nil(year, month):
+    ''' Checks that any L1 nodes that must reallocate its costs has no costs that have no cost centre allocated
 
     :param year:
     :param month:
     :return:
     '''
-    # ToDo: Refactor to capture instance where 'unassigned' cost centre across different GLs nets to zero
-    # ToDo: Refactor so that only costs are included in allocations (join to allocations table?)
+
     session = db_sessionmaker()
     date_to_check = datetime.datetime(year=year, month=month, day=1)
-    total_unassigned = session.query(func.sum(TableXeroExtract.Value))\
-        .filter(TableXeroExtract.CostCentreName==rp.XERO_UNASSIGNED_CC)\
+    total_unassigned = session.query(TableXeroExtract, TableChartOfAccounts, TableAllocationAccounts)\
+        .filter(TableXeroExtract.AccountCode==TableChartOfAccounts.XeroCode)\
+        .filter(TableChartOfAccounts.L3Code == TableAllocationAccounts.L2Hierarchy) \
+        .filter(TableXeroExtract.CostCentreName == rp.XERO_UNASSIGNED_CC) \
         .filter(TableXeroExtract.Period==date_to_check)\
         .all()
     session.close()
 
-    return (abs(total_unassigned[0][0])<r.ALLOCATIONS_MAX_ERROR) or (total_unassigned[0][0] == None)
+    L1_nodes = list(set([coa.L1Code for xero, coa, alloc_ac in total_unassigned]))
+
+    # Each L1 node should net to zero so that no unassigned costs are allocated to receiver cost centres
+    for L1_node in L1_nodes:
+        total_unallocated = abs(sum([xero.Value for xero, coa, alloc_ac in total_unassigned if coa.L1Code==L1_node]))
+        if total_unallocated > r.ALLOCATIONS_MAX_ERROR:
+            raise customobjects.error_objects.UnallocatedCostsNotNilError(
+                "Costs in cost centre '{}' for L1 node {} are not net flat (total = {})"
+                    .format(rp.XERO_UNASSIGNED_CC, L1_node, total_unallocated))
 
 def parse_xero_pnl_body_data(xero_data, list_of_cost_centres, year, month):
     ''' Parses the Profit & Loss (split by Cost Centre) report and imports into the database
@@ -177,6 +198,51 @@ def parse_xero_pnl_body_data(xero_data, list_of_cost_centres, year, month):
 
     return list_of_database_rows
 
+def parse_xero_balancesheet_body_data(xero_data, year, month):
+    ''' Parses the Balance Sheet report and creates a list of database rows
+
+    :param xero_data: Raw Xero output from the API
+    :param year:
+    :param month:
+    :return: List of TableXeroExtract row objects populated with data
+    '''
+
+    # ToDo: Refactor to combine parsing of Balance Sheet and Income Statement functions
+
+    timestamp = datetime.datetime.now()
+    period = datetime.datetime(year=year, month=month,day=1)
+    list_of_database_rows = []
+
+    report_name = xero_data['ReportID']
+    company_name = xero_data['ReportTitles'][1]
+
+    for row in xero_data['Rows']:
+        if row['RowType'] == "Section":
+            for section in row['Rows']:
+
+                try:
+                    account_name = section['Cells'][0]['Value']
+                    account_code = section['Cells'][0]['Attributes'][0]['Value']
+                except KeyError, e:
+                    pass    # Supress KeyErrors to exclude summary or totals rows (don't have 'Attributes' field)
+                else:
+                    # Exclude the first cell (the account name) and the last cell (prior year comparator)
+                    value = section['Cells'][1]['Value']
+                    xero_ledger_entry = TableXeroExtract(
+                                                        DateExtracted=timestamp,
+                                                        ReportName=report_name,
+                                                        CompanyName=company_name,
+                                                        CostCentreName=None,
+                                                        AccountCode=account_code,
+                                                        AccountName=account_name,
+                                                        Period=period,
+                                                        Value=value,
+                                                    )
+
+                    list_of_database_rows.append(xero_ledger_entry)
+
+    return list_of_database_rows
+
 def pull_xero_data_to_database(year, month):
     ''' Pulls data via the Xero API and imports it into the database
 
@@ -186,21 +252,33 @@ def pull_xero_data_to_database(year, month):
     '''
 
     # ToDo: Insert check in instance where no Xero data exists for period
+    # ToDo: Check whether the script should close the Xero connection once it has been used
 
-    utils.misc_functions.check_period_exists(year=year, month=month)
-    utils.misc_functions.check_period_is_locked(year=year, month=month)
-    xero_data = get_xero_profit_and_loss_data(year=year, month=month)
-    list_of_costcentres = get_list_of_cost_centres(xero_data=xero_data)
+    # Check that the period exists and is valid
+    utils.data_integrity.master_data_integrity_check(year=year, month=month)
+
+    # Pull both the Income Statement data and Balance Sheet data from the API
+    pnl_xero_data = get_xero_profit_and_loss_data(year=year, month=month)
+    list_of_costcentres = get_list_of_cost_centres(xero_data=pnl_xero_data) # Used for the Income Statement only
+    bs_xero_data = get_xero_balancesheet_data(year=year, month=month)
 
     try:
         session = db_sessionmaker()
-        data_rows = parse_xero_pnl_body_data(xero_data=xero_data, list_of_cost_centres=list_of_costcentres, year=year, month=month)
+        pnl_data_rows = parse_xero_pnl_body_data(xero_data=pnl_xero_data, list_of_cost_centres=list_of_costcentres,
+                                                 year=year, month=month)
+        bs_data_rows = parse_xero_balancesheet_body_data(xero_data=bs_xero_data, year=year, month=month)
 
         utils.misc_functions.delete_table_data_for_period(table=TableXeroExtract, year=year, month=month)
 
-        for data_row in data_rows:
+        for data_row in pnl_data_rows:
             if data_row.Value != 0:
                 session.add(data_row)
+
+        for data_row in bs_data_rows:
+            if data_row.Value != 0:
+                session.add(data_row)
+
         session.commit()
+
     finally:
         session.close()

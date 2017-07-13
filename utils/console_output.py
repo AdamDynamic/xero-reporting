@@ -15,9 +15,10 @@ from sqlalchemy import func, asc
 
 from customobjects.database_objects import TablePeriods, \
     TableXeroExtract, \
-    TableProfitAndLoss, \
-    TableConsolidatedIncomeStatement, \
+    TableFinancialStatements, \
+    TableConsolidatedFinStatements, \
     TableAllocationsData
+from management_accounting.cashflow_calcs import get_all_bs_nodes_unmapped_for_cashflow
 from utils.db_connect import db_sessionmaker
 import utils.misc_functions
 
@@ -151,10 +152,10 @@ def display_status_table():
         .all()
 
     # Count the number of rows of data converted to internal mappings
-    pnl_qry = session.query(TableProfitAndLoss.Period,
-                            func.count(TableProfitAndLoss.ID).label('count'),
-                            func.max(TableProfitAndLoss.TimeStamp).label('timestamp'))\
-        .group_by(TableProfitAndLoss.Period)\
+    pnl_qry = session.query(TableFinancialStatements.Period,
+                            func.count(TableFinancialStatements.ID).label('count'),
+                            func.max(TableFinancialStatements.TimeStamp).label('timestamp'))\
+        .group_by(TableFinancialStatements.Period)\
         .all()
 
     # Count the number of rows of data of allocated indirect costs
@@ -165,10 +166,10 @@ def display_status_table():
         .all()
 
     # Count the number of rows of data transformed into the consolidated income statement
-    consol_qry = session.query(TableConsolidatedIncomeStatement.Period,
-                               func.count(TableConsolidatedIncomeStatement.ID).label('count'),
-                               func.max(TableConsolidatedIncomeStatement.TimeStamp).label('timestamp'))\
-        .group_by(TableConsolidatedIncomeStatement.Period)\
+    consol_qry = session.query(TableConsolidatedFinStatements.Period,
+                               func.count(TableConsolidatedFinStatements.ID).label('count'),
+                               func.max(TableConsolidatedFinStatements.TimeStamp).label('timestamp'))\
+        .group_by(TableConsolidatedFinStatements.Period)\
         .all()
 
     # Convert to .date() as the data is extracted from the period_qry as datetime.date() objects
@@ -208,8 +209,17 @@ def display_status_table():
     print "\n" + tabulate(tabular_data=table_rows, headers=table_headers, numalign="right") + "\n"
 
     # Check whether any accounts aren't mapped to the master coa account
-    unmapped_accounts = utils.misc_functions.get_unmapped_account_codes()
+    unmapped_accounts = list(set(utils.misc_functions.get_unmapped_account_codes()))
     if unmapped_accounts:
         print "The following Xero accounts are unmapped in the chart of accounts:"
         for row in unmapped_accounts:
             print " " + str(row)
+
+    unmapped_cashflow_nodes = get_all_bs_nodes_unmapped_for_cashflow()
+    if unmapped_cashflow_nodes:
+        print "The following Balance Sheet nodes are unmapped for cash flow calculations:"
+        for row in unmapped_cashflow_nodes:
+            print " " + str(row)
+
+    # Check whether any balance sheet nodes aren't captured by the cash flow calculations
+    #unmapped_nodes = check_all_bs_nodes_mapped_for_cashflow()

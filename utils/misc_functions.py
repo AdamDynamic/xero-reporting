@@ -10,13 +10,14 @@ import datetime
 import errno
 import os
 
-import sqlalchemy
-import sqlalchemy.orm
-
-import references as r
-from customobjects.database_objects import TablePeriods, TableXeroExtract, TableChartOfAccounts, TableConsolidatedIncomeStatement
 from customobjects import error_objects
+from customobjects.database_objects import \
+    TablePeriods, \
+    TableXeroExtract, \
+    TableChartOfAccounts
+from utils.data_integrity import check_period_exists
 from utils.db_connect import db_sessionmaker
+
 
 def get_datetime_of_last_day_of_month(year, month):
     ''' Returns a datetime object of the last day of the month
@@ -52,38 +53,6 @@ def check_period_is_locked(year, month):
     else:
         return True
 
-def check_period_exists(year, month):
-    ''' Checks that the period is included in the database
-
-    :param year:
-    :param month:
-    :return:
-    '''
-
-    # Check that the inputs are basically correct (i.e. year in sensible range, month between 1 and 12)
-    if (year in r.AVAILABLE_PERIODS_YEARS):
-        if (month in r.AVAILABLE_PERIODS_MONTHS):
-            pass
-        else:
-            raise  error_objects.PeriodNotFoundError("Month {} is not included in range of valid inputs: {}".format(month, r.AVAILABLE_PERIODS_MONTHS))
-    else:
-        raise error_objects.PeriodNotFoundError("Year {} is not included in range of valid inputs: {}".format(year, r.AVAILABLE_PERIODS_YEARS))
-
-    # Check that the period exists in the database Periods table
-    try:
-        session = db_sessionmaker()
-        period_to_update = datetime.datetime(year=year, month=month, day=1)
-        period_check = session.query(TablePeriods) \
-            .filter(TablePeriods.Period == period_to_update) \
-            .one()
-    except sqlalchemy.orm.exc.NoResultFound:
-        raise error_objects.PeriodNotFoundError("Period {}.{} does not exist in table {}"
-                                                .format(year, month, TablePeriods.__tablename__))
-    else:
-        return True
-    finally:
-        session.close()
-
 def check_table_has_records_for_period(year,month,table):
     ''' Checks whether a table contains a non-zero number of records for a given period
 
@@ -93,7 +62,7 @@ def check_table_has_records_for_period(year,month,table):
     :return:
     '''
 
-    check_period_exists(year=year,month=month)
+    check_period_exists(year=year, month=month)
     period_to_check = datetime.datetime(year=year, month=month, day=1)
     session = db_sessionmaker()
     result = session.query(table).filter(table.Period==period_to_check).all()
@@ -164,7 +133,7 @@ def convert_dir_path_to_standard_format(folder_path):
     return folder_path
 
 def open_or_create_folder(dir_path):
-    ''' If a directory doesn't already exist, that folder is created
+    ''' If a directory doesn't already exist, that directory is created
 
     :param dir_path:
     :return:
@@ -175,11 +144,6 @@ def open_or_create_folder(dir_path):
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
-
-def check_directory_exists(dir_path):
-
-    return os.path.isdir(dir_path)
-
 
 def output_table_to_csv(table, output_directory):
     ''' Outputs a database table to a *.csv file, saved to a location specified by the user
@@ -206,3 +170,4 @@ def output_table_to_csv(table, output_directory):
     writer.writerow(table.__table__.columns.keys())
     [writer.writerow([getattr(curr, column.name) for column in table.__mapper__.columns]) for curr in records]
     output_file.close()
+

@@ -8,6 +8,7 @@ Contains unit tests for the misc_functions.py module
 import datetime
 import unittest
 
+import utils.data_integrity
 from customobjects import error_objects
 from utils import misc_functions
 import references as r
@@ -40,6 +41,6 @@ class Test_MiscFunctions(unittest.TestCase):
 
         for error_year in error_years:
             for error_month in error_months:
-                self.assertRaises(error_objects.PeriodNotFoundError, misc_functions.check_period_exists, error_year, correct_month)
-                self.assertRaises(error_objects.PeriodNotFoundError, misc_functions.check_period_exists, error_year, error_month)
-                self.assertRaises(error_objects.PeriodNotFoundError, misc_functions.check_period_exists, correct_year, error_month)
+                self.assertRaises(error_objects.PeriodNotFoundError, utils.data_integrity.check_period_exists, error_year, correct_month)
+                self.assertRaises(error_objects.PeriodNotFoundError, utils.data_integrity.check_period_exists, error_year, error_month)
+                self.assertRaises(error_objects.PeriodNotFoundError, utils.data_integrity.check_period_exists, correct_year, error_month)

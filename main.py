@@ -10,9 +10,10 @@ import requests
 
 import click
 
+import utils.data_integrity
 from customobjects import error_objects, database_objects
 from management_accounting.allocations import allocate_indirect_cost_for_period
-from management_accounting.data_import import create_internal_profit_and_loss, create_consolidated_income_statement
+from management_accounting.data_import import create_internal_financial_statements, create_consolidated_financial_statements
 import references as r
 from utils.console_output import util_output, display_status_table
 import utils.misc_functions
@@ -39,11 +40,9 @@ def get_xero_data(year, month):
         pull_xero_data_to_database(year=year, month=month)
         util_output("Pull of Xero data for period {}.{} is complete".format(year, month))
 
-    except error_objects.PeriodIsLockedError, e:
-        util_output("ERROR: {}".format(e.message))
-        util_output("ERROR: Import of Xero data aborted")
-
-    except error_objects.PeriodNotFoundError, e:
+    except (error_objects.PeriodIsLockedError,
+            error_objects.PeriodNotFoundError,
+            error_objects.MasterDataIncompleteError), e:
         util_output("ERROR: {}".format(e.message))
         util_output("ERROR: Import of Xero data aborted")
 
@@ -65,18 +64,13 @@ def convert_xero_data(year, month):
 
     try:
         util_output("Converting Xero data for period {}.{}".format(year, month))
-        create_internal_profit_and_loss(year=year, month=month)
+        create_internal_financial_statements(year=year, month=month)
         util_output("Conversion of Xero data complete")
 
-    except error_objects.PeriodIsLockedError, e:
-        util_output("ERROR: {}".format(e.message))
-        util_output("ERROR: Conversion of Xero data is aborted")
-
-    except error_objects.PeriodNotFoundError, e:
-        util_output("ERROR: {}".format(e.message))
-        util_output("ERROR: Conversion of Xero data is aborted")
-
-    except error_objects.TableEmptyForPeriodError, e:
+    except (error_objects.PeriodIsLockedError,
+            error_objects.PeriodNotFoundError,
+            error_objects.TableEmptyForPeriodError,
+            error_objects.MasterDataIncompleteError), e:
         util_output("ERROR: {}".format(e.message))
         util_output("ERROR: Conversion of Xero data is aborted")
 
@@ -98,15 +92,10 @@ def run_allocations(year, month):
         allocate_indirect_cost_for_period(year=year, month=month)
         util_output("Allocation process for period {}.{} is complete".format(year, month))
 
-    except error_objects.PeriodIsLockedError, e:
-        util_output("ERROR: {}".format(e.message))
-        util_output("ERROR: Creation of cost allocations aborted")
-
-    except error_objects.PeriodNotFoundError, e:
-        util_output("ERROR: {}".format(e.message))
-        util_output("ERROR: Creation of cost allocations aborted")
-
-    except error_objects.TableEmptyForPeriodError, e:
+    except (error_objects.PeriodIsLockedError,
+            error_objects.PeriodNotFoundError,
+            error_objects.TableEmptyForPeriodError,
+            error_objects.MasterDataIncompleteError), e:
         util_output("ERROR: {}".format(e.message))
         util_output("ERROR: Creation of cost allocations aborted")
 
@@ -123,18 +112,13 @@ def create_consolidated_table(year,month):
     '''
     try:
         util_output("Creating consolidated Income Statement for period {}.{}...".format(year, month))
-        create_consolidated_income_statement(year=year, month=month)
+        create_consolidated_financial_statements(year=year, month=month)
         util_output("Creation of consolidated Income Statement complete")
 
-    except error_objects.PeriodIsLockedError, e:
-        util_output("ERROR: {}".format(e.message))
-        util_output("ERROR: Creation of consolidated table aborted")
-
-    except error_objects.PeriodNotFoundError, e:
-        util_output("ERROR: {}".format(e.message))
-        util_output("ERROR: Creation of consolidated table aborted")
-
-    except error_objects.TableEmptyForPeriodError, e:
+    except (error_objects.PeriodIsLockedError,
+            error_objects.PeriodNotFoundError,
+            error_objects.TableEmptyForPeriodError,
+            error_objects.MasterDataIncompleteError), e:
         util_output("ERROR: {}".format(e.message))
         util_output("ERROR: Creation of consolidated table aborted")
 
@@ -153,7 +137,7 @@ def set_period_lock(year, month, locked):
     '''
 
     try:
-        utils.misc_functions.check_period_exists(year=year, month=month)
+        utils.data_integrity.check_period_exists(year=year, month=month)
 
     except error_objects.PeriodNotFoundError, e:
         util_output("ERROR: {}".format(e.message))
@@ -200,7 +184,7 @@ def output_to_csv(folder):
         folder = utils.misc_functions.convert_dir_path_to_standard_format(folder_path=output_dir)
         utils.misc_functions.open_or_create_folder(folder)
         util_output("Outputting table {} to default file location:\n{}..."
-                    .format(database_objects.TableConsolidatedIncomeStatement.__tablename__, folder))
+                    .format(database_objects.TableConsolidatedFinStatements.__tablename__, folder))
     else:
 
         # Standardise the folder passed to the function by the user
@@ -209,17 +193,17 @@ def output_to_csv(folder):
         folder = utils.misc_functions.convert_dir_path_to_standard_format(folder_path=folder)
 
         util_output("Outputting table {} to user-specified file location:\n{}..."
-                    .format(database_objects.TableConsolidatedIncomeStatement.__tablename__, folder))
+                    .format(database_objects.TableConsolidatedFinStatements.__tablename__, folder))
 
     # If the inputted folder is correctly formatted and exists, output the table
-    if utils.misc_functions.check_directory_exists(folder):
-        utils.misc_functions.output_table_to_csv(table=database_objects.TableConsolidatedIncomeStatement,
+    if utils.data_integrity.check_directory_exists(folder):
+        utils.misc_functions.output_table_to_csv(table=database_objects.TableConsolidatedFinStatements,
                                                  output_directory=folder)
         util_output("Table output complete.")
     else:
         util_output("ERROR: Directory {} does not exist".format(folder))
         util_output("ERROR: Output of table {} aborted".format(database_objects.
-                                                               TableConsolidatedIncomeStatement.__tablename__))
+                                                               TableConsolidatedFinStatements.__tablename__))
 
 
 @fin_reporting.command(help="Displays the current status of the reporting data in the database")

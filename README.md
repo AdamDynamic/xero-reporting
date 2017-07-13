@@ -71,7 +71,7 @@ Support functions in the business that exist to facilitate the company's commerc
 Level 3 cost centres comprise of costs used by all other areas of the business. These are:
  - Rent
  - Building service charges
- - Telecoms (e.g. the cost of the phones, the fibre, etc)
+ - Telecoms (e.g. the cost of the telephones, the fibre, etc)
  - The company Slack subscription
 
 
@@ -89,10 +89,19 @@ Level 1 does not allocate any of its direct or indirect costs.
 
 *Costs are allocated based on the headcount of the receiving cost centres*. For example, if a L2 cost centre was allocating its costs to two L1 cost centres that had 3 and 7 heads respectively, the first L1 cost centre would receive 30% of the L2's costs, and the second L1 cost centre would receive the remaining 70%.
 
+
+## Cashflow
+
+The Xero API does not provide any cashflow reports so instead the cashflows must be calculated from the Income Statement and Balance Sheet using the indirect method. 
+
+This requires that the master data be correctly configured. The `references.py` file contains the relevant nodes used for the calculations of _Cashflow from Operations_, _Cashflow from Investments_ and _Cashflow from Financing_.
+
+The calculated indirect cashflow for the period is compared to the movement in the cash balances between Balance Sheet dates to validate the calculations.
+
 ## To-Do List
 
 The following items are still outstanding:
 
 1. Way of efficiently updating the headcount table to account for joiners/leavers
-2. A way of outputing the consolidated final table to a spreadsheet
-3. Extract, re-mapping and output of cashflow data from Xero
+2. Unit testing for `cashflow_calcs.py` module.
+

@@ -24,7 +24,7 @@ class TableXeroExtract(Base):
     DateExtracted = Column(DateTime)
     ReportName = Column(String)
     CompanyName = Column(String)
-    CostCentreName = Column(String)
+    CostCentreName = Column(String, nullable=True)
     AccountCode = Column(String)
     AccountName = Column(String)
     Period = Column(DateTime)
@@ -94,17 +94,17 @@ class TableCompanies(Base):
     ClearmaticsCode = Column(Integer)
 
 
-class TableProfitAndLoss(Base):
+class TableFinancialStatements(Base):
     '''
-    SQLAlchemy ORM class for the tbl_DATA_profitandloss table
+    SQLAlchemy ORM class for the tbl_DATA_financialstatements table
     '''
 
-    __tablename__ = r.TBL_DATA_PROFITANDLOSS
+    __tablename__ = r.TBL_DATA_FINANCIALSTATEMENTS
 
     ID = Column(Integer, primary_key=True)
     TimeStamp = Column(DateTime)
     CompanyCode = Column(Integer, ForeignKey(r.TBL_MASTER_COMPANIES + "." + r.COL_COMPANIES_CLEARMATICSCODE))
-    CostCentreCode = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES + "." + r.COL_CC_CLEARMATICSCODE))
+    CostCentreCode = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES + "." + r.COL_CC_CLEARMATICSCODE), nullable=True)
     Period = Column(DateTime)
     AccountCode = Column(Integer, ForeignKey(r.TBL_MASTER_CHARTOFACCOUNTS + "." + r.COL_CHARTACC_CLEARMATICSCODE))
     Value = Column(Float)
@@ -156,10 +156,8 @@ class TableChartOfAccounts(Base):
     ClearmaticsName = Column(String)
     XeroCode = Column(String)
     XeroName = Column(String)
-    L0Code = Column(String)
-    L0Name = Column(String)
-    L1Code = Column(String)
-    L1Name = Column(String)
+    L3Code = Column(String)
+    L3Name = Column(String)
     XeroMultiplier = Column(Integer)
 
 
@@ -170,13 +168,18 @@ class TableAllocationAccounts(Base):
 
     __tablename__ = r.TBL_MASTER_ALLOCACCOUNTS
 
-    ClearmaticsCode = Column(Integer, primary_key=True)
+    ID = Column(Integer, primary_key=True)
+    ClearmaticsCode = Column(Integer)
     ClearmaticsName = Column(String)
-    L1Hierarchy = Column(String)
+    L2Hierarchy = Column(String)
     L0Code = Column(String)
     L0Name = Column(String)
     L1Code = Column(String)
     L1Name = Column(String)
+    L2Code = Column(String)
+    L2Name = Column(String)
+    L3Code = Column(String)
+    L3Name = Column(String)
 
 
 class TableAllocationsData(Base):
@@ -198,12 +201,12 @@ class TableAllocationsData(Base):
     Value = Column(Float)
 
 
-class TableConsolidatedIncomeStatement(Base):
+class TableConsolidatedFinStatements(Base):
     '''
-    SQLAlchemt ORM class for the tbl_OUTPUT_consolidated_is tabe
+    SQLAlchemt ORM class for the tbl_OUTPUT_consolidated_is table
     '''
 
-    __tablename__ = r.TBL_OUTPUT_CONSOL_IS
+    __tablename__ = r.TBL_OUTPUT_CONSOL_FINSTAT
 
     ID = Column(Integer, primary_key=True)
     Period = Column(DateTime)
@@ -211,17 +214,86 @@ class TableConsolidatedIncomeStatement(Base):
     CompanyName = Column(String)
     PartnerCompanyCode = Column(Integer, nullable=True)
     PartnerCompanyName = Column(String, nullable=True)
-    CostCentreCode = Column(String)
-    CostCentreName = Column(String)
+    CostCentreCode = Column(String, nullable=True)
+    CostCentreName = Column(String, nullable=True)
     PartnerCostCentreCode = Column(String, nullable=True)
     PartnerCostCentreName = Column(String, nullable=True)
     FinancialStatement = Column(String)
     GLAccountCode = Column(Integer)
     GLAccountName = Column(String)
-    L1HierarchyCode = Column(String)
-    L1HierarchyName = Column(String)
-    CostHierarchyNumber = Column(Integer)
+    L1Code = Column(String)
+    L1Name = Column(String)
+    L2Code = Column(String)
+    L2Name = Column(String)
+    L3Code = Column(String)
+    L3Name = Column(String)
+    CostHierarchyNumber = Column(Integer, nullable=True)
     Value = Column(Float)
     TimeStamp = Column(DateTime)
+
+    def __repr__(self):
+        return "<ID: {}, " \
+               "Period: {}, " \
+               "CompCode: {}, " \
+               "CompName: {}, " \
+               "PartCompCode: {}, " \
+               "PartCompName: {}, " \
+               "CostCenCode: {}, " \
+               "CostCenName: {}, " \
+               "PartCostCenCode: {}, " \
+               "PartCostCenName: {}, " \
+               "FinStat: {}, " \
+               "GLCode: {}, " \
+               "GLName: {}, " \
+               "L1Code: {}, " \
+               "L1Name: {}, " \
+               "L2Code: {}, " \
+               "L2Name: {}, " \
+               "L3Code: {}, " \
+               "L3Name: {}, " \
+               "CostHierNo: {}, " \
+               "Value: {}, " \
+               "TimeStamp: {}>"\
+            .format(self.ID,
+                    self.Period,
+                    self.CompanyCode,
+                    self.CompanyName,
+                    self.PartnerCompanyCode,
+                    self.PartnerCompanyName,
+                    self.CostCentreCode,
+                    self.CostCentreName,
+                    self.PartnerCostCentreCode,
+                    self.PartnerCostCentreName,
+                    self.FinancialStatement,
+                    self.GLAccountCode,
+                    self.GLAccountName,
+                    self.L1Code,
+                    self.L1Name,
+                    self.L2Code,
+                    self.L2Name,
+                    self.L3Code,
+                    self.L3Name,
+                    self.CostHierarchyNumber,
+                    self.Value,
+                    self.TimeStamp
+                    )
+
+
+class TableNodeHierarchy(Base):
+    '''
+    SQLAlchemy ORM class for the tbl_MASTER_nodehierarchy table
+    '''
+
+    __tablename__ = r.TBL_MASTER_NODEHIERARCHY
+
+    ID = Column(Integer, primary_key=True)
+    L0Code = Column(String)
+    L0Name = Column(String)
+    L1Code = Column(String)
+    L1Name = Column(String)
+    L2Code = Column(String)
+    L2Name = Column(String)
+    L3Code = Column(String)
+    L3Name = Column(String)
 
 

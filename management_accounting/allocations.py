@@ -12,14 +12,16 @@ import datetime
 from sqlalchemy import or_
 
 from customobjects.database_objects import TableCostCentres, \
-    TableProfitAndLoss, \
+    TableFinancialStatements, \
     TableChartOfAccounts, \
     TableAllocationAccounts, \
     TableAllocationsData, \
-    TableHeadcount
+    TableHeadcount,\
+    TableNodeHierarchy
 from customobjects.helper_objects import CostCentre, Employee, Cost
 import references as r
 from utils.db_connect import db_sessionmaker
+import utils.data_integrity
 import utils.misc_functions
 
 
@@ -94,34 +96,35 @@ def get_direct_costs_by_cc_by_node(year=None, month=None):
 
     session = db_sessionmaker()
     period = datetime.datetime(year=year, month=month, day=1)
-    qry_costs = session.query(TableProfitAndLoss, TableChartOfAccounts, TableAllocationAccounts)\
-        .filter(TableProfitAndLoss.AccountCode==TableChartOfAccounts.ClearmaticsCode)\
-        .filter(TableChartOfAccounts.L1Code==TableAllocationAccounts.L1Hierarchy)\
-        .filter(TableProfitAndLoss.Period==period)\
+    qry_costs = session.query(TableFinancialStatements, TableChartOfAccounts, TableNodeHierarchy, TableAllocationAccounts)\
+        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.ClearmaticsCode)\
+        .filter(TableChartOfAccounts.L3Code == TableNodeHierarchy.L3Code)\
+        .filter(TableNodeHierarchy.L2Code == TableAllocationAccounts.L2Hierarchy)\
+        .filter(TableFinancialStatements.Period == period)\
         .all()
     session.close()
     # ToDO: Insert check that all account codes in the P&L are correctly mapped in the Chart of Accounts
     assert qry_costs != [], "Query in get_direct_costs_by_cc_by_node returned no results for period {}.{}".format(year, month)
-
     output_dict = {}
     # Get all cost centres in the extracted data
-    list_of_costcentres = list(set([pnl.CostCentreCode for pnl, coa, alloc in qry_costs]))
+    list_of_costcentres = list(set([pnl.CostCentreCode for pnl, coa, node, alloc in qry_costs]))
     # Get all cost categories in the extracted data
-    list_of_costcategories = list(set([(coa.L1Code, alloc.ClearmaticsCode) for pnl, coa, alloc in qry_costs]))
+    list_of_costcategories = list(set([(node.L2Code, alloc.ClearmaticsCode) for pnl, coa, node, alloc in qry_costs]))
 
     # Create cost objects for each cost centre for each hierarchy node
     output_dict = {}
     for cc in list_of_costcentres: # e.g. C000001, C000002, etc
         list_of_costs = []
-        for costcategory in list_of_costcategories: # e.g. L1FIN, L1STAFF, etc
+        for costcategory in list_of_costcategories: # e.g. L2-FIN, L2-STAFF, etc
             cost = Cost()
             cost.period = period
             cost.master_code = costcategory[0]
             cost.allocation_account_code = costcategory[1]
-            cost.amount = sum([pnl.Value for pnl, coa, alloc in qry_costs if pnl.CostCentreCode == cc and coa.L1Code == costcategory[0]])
+            cost.amount = sum([pnl.Value for pnl, coa, node, alloc in qry_costs if pnl.CostCentreCode == cc and node.L2Code == costcategory[0]])
             if abs(cost.amount) > r.ALLOCATIONS_MAX_ERROR:    # Filter out near-zero costs to reduce number of records up-stream
                 list_of_costs.append(cost)
         output_dict[cc]=list_of_costs
+
     return output_dict
 
 def get_populated_costcentres(year=None, month=None):
@@ -188,7 +191,7 @@ def allocate_dir_costs_for_tier(sender_costcentres, receiving_costcentres, alloc
             for cost in direct_costs_to_allocate:
                 if cost.amount != 0:
 
-                    allocated_cost = alloc_percentages[sender_cc.master_code][receiving_cc.master_code] * cost.amount
+                    allocated_cost = alloc_percentages[sender_cc.master_code][receiving_cc.master_code] * float(cost.amount)
 
                     if allocated_cost != 0:
                         received_cost = Cost()
@@ -217,7 +220,7 @@ def allocate_dir_costs_for_tier(sender_costcentres, receiving_costcentres, alloc
     for cc in sender_costcentres:
         total_direct_costs = sum([cost.amount for cost in cc.direct_costs])
         total_allocated_costs = sum([cost.amount for cost in cc.allocated_costs if cost.cost_hierarchy==level-1])
-        assert abs(total_direct_costs+total_allocated_costs)<r.ALLOCATIONS_MAX_ERROR, "Total direct costs {} not equal allocated costs {} for cc \n{}\n{}\n{}"\
+        assert abs(float(total_direct_costs)+float(total_allocated_costs))<r.ALLOCATIONS_MAX_ERROR, "Total direct costs {} not equal allocated costs {} for cc \n{}\n{}\n{}"\
             .format(total_direct_costs, total_allocated_costs, cc, [cost for cost in cc.direct_costs], [cost for cost in cc.allocated_costs])
 
     return (sender_costcentres, receiving_costcentres)
@@ -334,9 +337,8 @@ def allocate_indirect_cost_for_period(year, month):
     '''
 
     # Perform validation checks on the data before proceeding with processing
-    utils.misc_functions.check_period_exists(year=year, month=month)
-    utils.misc_functions.check_period_is_locked(year=year, month=month)
-    utils.misc_functions.check_table_has_records_for_period(year=year, month=month, table=TableProfitAndLoss)
+    utils.data_integrity.master_data_integrity_check(year=year, month=month)
+    utils.misc_functions.check_table_has_records_for_period(year=year, month=month, table=TableFinancialStatements)
 
     # Get a list of cost centres populated with headcount and costs per hierarchy level
     unprocessed_costcentres = get_populated_costcentres(year=year, month=month)
