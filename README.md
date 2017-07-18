@@ -1,7 +1,7 @@
 
 # Management Reporting Database
 
-The purpose of this module is to generate a standardised set of company financial data that can be used for management reporting purposes. 
+The purpose of this repo is to generate a standardised set of company financial data that can be used for management reporting purposes by users of Xero.
 
 ## Command Line Interface
 
@@ -27,11 +27,11 @@ Runs the cost allocation process on the direct costs of support functions. Optio
 
 4. `create_consolidated_table`
 
-Creates a user-readable Income Statement that combines both the Xero data (converted to Clearmatics master data mappings) and the allocated cost data. Options are `--year` and `--month` to set the period you want to create the consolidated table for.
+Creates a user-readable Income Statement that combines both the Xero data (converted to master data mappings of the user company) and the allocated cost data. Options are `--year` and `--month` to set the period you want to create the consolidated table for.
 
 Once `get_xero_data`, `convert_xero_data`, `run_allocations` and `create_consolidated_table` have been run (*in that order*) then the data is ready to be reported on. See the `status` function below for user visibility on whether the process has been run correctly.
 
-### Other functions
+### Other Functions
 
 `set_period_lock`
 
@@ -50,6 +50,11 @@ The purpose of this check is to mitigate the risk that one step in the process i
 Outputs a .csv file of the consolidated income statement to folder called `fin-data-output`. By default the file is created in the directory the `main.py` file resides in (in a sub-folder called `fin-data-output` which the script will create automatically if it doesn't already exist).
 
 The user can specify the output file using the `--folder=/user/specified/filepath/here` flag.
+
+## Master Data
+
+
+To use the repo the user must define certain master data for the user company that Xero data is then mapped against. The purpose of re-mapping the Xero data is to accommodate instances where financial data must be mapped against a standard internal master data already in use within the company, or where data must be compared against non-Xero data and a common set of master data is used to facilitate this.
 
 
 ## Cost Centre Hierarchy
