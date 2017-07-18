@@ -55,7 +55,7 @@ def get_all_employees_from_database(year=None, month=None):
         emp.job_title = row.JobTitle
         emp.start_date = row.StartDate
         emp.end_date = row.EndDate
-        emp.cost_centre = row.CostCentre
+        emp.cost_centre = row.CostCentreCode
         emp.company_code = row.CompanyCode
 
         list_of_employees.append(emp)
@@ -77,8 +77,8 @@ def get_all_cost_centres_from_database():
     list_of_costcentres = []
     for row in qry_costcentres:
         cc = CostCentre()
-        cc.master_name = row.ClearmaticsName
-        cc.master_code = row.ClearmaticsCode
+        cc.master_name = row.CostCentreName
+        cc.master_code = row.CostCentreCode
         cc.hierarchy_tier = row.AllocationTier
         cc.employees = []
 
@@ -97,7 +97,7 @@ def get_direct_costs_by_cc_by_node(year=None, month=None):
     session = db_sessionmaker()
     period = datetime.datetime(year=year, month=month, day=1)
     qry_costs = session.query(TableFinancialStatements, TableChartOfAccounts, TableNodeHierarchy, TableAllocationAccounts)\
-        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.ClearmaticsCode)\
+        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.GLCode)\
         .filter(TableChartOfAccounts.L3Code == TableNodeHierarchy.L3Code)\
         .filter(TableNodeHierarchy.L2Code == TableAllocationAccounts.L2Hierarchy)\
         .filter(TableFinancialStatements.Period == period)\
@@ -109,7 +109,7 @@ def get_direct_costs_by_cc_by_node(year=None, month=None):
     # Get all cost centres in the extracted data
     list_of_costcentres = list(set([pnl.CostCentreCode for pnl, coa, node, alloc in qry_costs]))
     # Get all cost categories in the extracted data
-    list_of_costcategories = list(set([(node.L2Code, alloc.ClearmaticsCode) for pnl, coa, node, alloc in qry_costs]))
+    list_of_costcategories = list(set([(node.L2Code, alloc.GLCode) for pnl, coa, node, alloc in qry_costs]))
 
     # Create cost objects for each cost centre for each hierarchy node
     output_dict = {}
@@ -121,7 +121,7 @@ def get_direct_costs_by_cc_by_node(year=None, month=None):
             cost.master_code = costcategory[0]
             cost.allocation_account_code = costcategory[1]
             cost.amount = sum([pnl.Value for pnl, coa, node, alloc in qry_costs if pnl.CostCentreCode == cc and node.L2Code == costcategory[0]])
-            if abs(cost.amount) > r.ALLOCATIONS_MAX_ERROR:    # Filter out near-zero costs to reduce number of records up-stream
+            if abs(cost.amount) > r.DEFAULT_MAX_CALC_ERROR:    # Filter out near-zero costs to reduce number of records up-stream
                 list_of_costs.append(cost)
         output_dict[cc]=list_of_costs
 
@@ -220,7 +220,7 @@ def allocate_dir_costs_for_tier(sender_costcentres, receiving_costcentres, alloc
     for cc in sender_costcentres:
         total_direct_costs = sum([cost.amount for cost in cc.direct_costs])
         total_allocated_costs = sum([cost.amount for cost in cc.allocated_costs if cost.cost_hierarchy==level-1])
-        assert abs(float(total_direct_costs)+float(total_allocated_costs))<r.ALLOCATIONS_MAX_ERROR, "Total direct costs {} not equal allocated costs {} for cc \n{}\n{}\n{}"\
+        assert abs(float(total_direct_costs)+float(total_allocated_costs))<r.DEFAULT_MAX_CALC_ERROR, "Total direct costs {} not equal allocated costs {} for cc \n{}\n{}\n{}"\
             .format(total_direct_costs, total_allocated_costs, cc, [cost for cost in cc.direct_costs], [cost for cost in cc.allocated_costs])
 
     return (sender_costcentres, receiving_costcentres)
@@ -302,8 +302,8 @@ def upload_allocated_costs(costcentres):
                                         DateAllocationsRun = upload_time,
                                         SendingCostCentre = cost.counterparty_costcentre,
                                         ReceivingCostCentre = cc.master_code,
-                                        SendingCompany = r.COMPANY_CODE_CLEARMATICS, # ToDo: Refactor to make this dynamic
-                                        ReceivingCompany = r.COMPANY_CODE_CLEARMATICS, # ToDo: Refactor to make this dynamic
+                                        SendingCompany = r.COMPANY_CODE_MAINCO, # ToDo: Refactor to make this dynamic
+                                        ReceivingCompany = r.COMPANY_CODE_MAINCO, # ToDo: Refactor to make this dynamic
                                         Period = cost.period,
                                         GLAccount = cost.ledger_account_code,
                                         CostHierarchy = cost.cost_hierarchy,

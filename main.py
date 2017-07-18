@@ -55,10 +55,10 @@ def get_xero_data(year, month):
 @click.option('--year', type=int, help="The year of the period of Xero data to convert")
 @click.option('--month', type=int, help="The month of the period of Xero data to convert")
 def convert_xero_data(year, month):
-    '''
+    ''' Converts imported Xero data into the standardised internal format
 
-    :param year:
-    :param month:
+    :param year: Year to convert (Integer)
+    :param month: Month of the year to convert (Integer)
     :return:
     '''
 
@@ -70,7 +70,9 @@ def convert_xero_data(year, month):
     except (error_objects.PeriodIsLockedError,
             error_objects.PeriodNotFoundError,
             error_objects.TableEmptyForPeriodError,
-            error_objects.MasterDataIncompleteError), e:
+            error_objects.MasterDataIncompleteError,
+            error_objects.BalanceSheetImbalanceError,
+            error_objects.CashFlowCalculationError), e:
         util_output("ERROR: {}".format(e.message))
         util_output("ERROR: Conversion of Xero data is aborted")
 
@@ -82,8 +84,8 @@ def run_allocations(year, month):
     ''' Runs the allocation process on extracted Xero data following its conversion to
         standardised company master data
 
-    :param year:
-    :param month:
+    :param year: Year of the period to run allocations on (Integer)
+    :param month: Month of the period to run allocations on (Integer)
     :return:
     '''
 
@@ -95,7 +97,9 @@ def run_allocations(year, month):
     except (error_objects.PeriodIsLockedError,
             error_objects.PeriodNotFoundError,
             error_objects.TableEmptyForPeriodError,
-            error_objects.MasterDataIncompleteError), e:
+            error_objects.MasterDataIncompleteError,
+            error_objects.BalanceSheetImbalanceError,
+            error_objects.CashFlowCalculationError), e:
         util_output("ERROR: {}".format(e.message))
         util_output("ERROR: Creation of cost allocations aborted")
 
@@ -118,7 +122,9 @@ def create_consolidated_table(year,month):
     except (error_objects.PeriodIsLockedError,
             error_objects.PeriodNotFoundError,
             error_objects.TableEmptyForPeriodError,
-            error_objects.MasterDataIncompleteError), e:
+            error_objects.MasterDataIncompleteError,
+            error_objects.BalanceSheetImbalanceError,
+            error_objects.CashFlowCalculationError), e:
         util_output("ERROR: {}".format(e.message))
         util_output("ERROR: Creation of consolidated table aborted")
 

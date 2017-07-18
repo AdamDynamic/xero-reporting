@@ -12,7 +12,7 @@ import sqlalchemy
 import references as r
 from customobjects import error_objects
 from customobjects.database_objects import TableChartOfAccounts, TableAllocationAccounts, TableCostCentres, \
-    TableCompanies, TableNodeHierarchy, TablePeriods
+    TableCompanies, TableNodeHierarchy, TablePeriods, TableFinancialStatements
 from utils.db_connect import db_sessionmaker
 
 
@@ -43,29 +43,41 @@ def master_data_uniquesness_check():
     :return:
     '''
 
-    if not confirm_table_column_is_unique(TableChartOfAccounts, r.COL_CHARTACC_CLEARMATICSCODE):
-        raise error_objects.MasterDataIncompleteError("Table {} has duplicate values in column {}"
-                                                      .format(TableChartOfAccounts.__tablename__, r.COL_CHARTACC_CLEARMATICSCODE))
+    consolidated_error_message = ""
+    is_error = False
+
+    if not confirm_table_column_is_unique(TableChartOfAccounts, r.COL_CHARTACC_GLCODE):
+        is_error = True
+        consolidated_error_message += "\n    Table {} has duplicate values in column {}"\
+            .format(TableChartOfAccounts.__tablename__, r.COL_CHARTACC_GLCODE)
 
     if not confirm_table_column_is_unique(TableAllocationAccounts, r.COL_ALLOCACC_CODE):
-        raise error_objects.MasterDataIncompleteError("Table {} has duplicate values in column {}"
-                                                      .format(TableAllocationAccounts.__tablename__, r.COL_ALLOCACC_CODE))
+        is_error = True
+        consolidated_error_message += "\n    Table {} has duplicate values in column {}"\
+                                                      .format(TableAllocationAccounts.__tablename__, r.COL_ALLOCACC_CODE)
 
-    if not confirm_table_column_is_unique(TableCostCentres, r.COL_CC_CLEARMATICSCODE):
-        raise error_objects.MasterDataIncompleteError("Table {} has duplicate values in column {}"
-                                                      .format(TableCostCentres.__tablename__, r.COL_CC_CLEARMATICSCODE))
+    if not confirm_table_column_is_unique(TableCostCentres, r.COL_CC_CODE):
+        is_error = True
+        consolidated_error_message += "\n    Table {} has duplicate values in column {}"\
+                                                      .format(TableCostCentres.__tablename__, r.COL_CC_CODE)
 
-    if not confirm_table_column_is_unique(TableCompanies, r.COL_COMPANIES_CLEARMATICSCODE):
-        raise error_objects.MasterDataIncompleteError("Table {} has duplicate values in column {}"
-                                                      .format(TableCompanies.__tablename__, r.COL_COMPANIES_CLEARMATICSCODE))
+    if not confirm_table_column_is_unique(TableCompanies, r.COL_COMPANIES_COMPCODE):
+        is_error = True
+        consolidated_error_message += "\n    Table {} has duplicate values in column {}"\
+                                                      .format(TableCompanies.__tablename__, r.COL_COMPANIES_COMPCODE)
 
     if not confirm_table_column_is_unique(TableNodeHierarchy, r.COL_NODE_L3CODE):
-        raise error_objects.MasterDataIncompleteError("Table {} has duplicate values in column {}"
-                                                      .format(TableNodeHierarchy.__tablename__, r.COL_NODE_L3CODE))
+        is_error = True
+        consolidated_error_message += "\n    Table {} has duplicate values in column {}"\
+                                                      .format(TableNodeHierarchy.__tablename__, r.COL_NODE_L3CODE)
 
     if not confirm_table_column_is_unique(TablePeriods, r.COL_PERIOD_PERIOD):
-        raise error_objects.MasterDataIncompleteError("Table {} has duplicate values in column {}"
-                                                      .format(TablePeriods.__tablename__, r.COL_PERIOD_PERIOD))
+        is_error = True
+        consolidated_error_message += "\n    Table {} has duplicate values in column {}"\
+                                                      .format(TablePeriods.__tablename__, r.COL_PERIOD_PERIOD)
+    if is_error:
+        raise error_objects.MasterDataIncompleteError("The Master Data contains the following errors:\n{}"
+                                                      .format(consolidated_error_message))
 
 def check_period_is_locked(year, month):
     ''' Checks whether a period in the reporting database is locked for changes
@@ -126,16 +138,34 @@ def check_directory_exists(dir_path):
 
     return os.path.isdir(dir_path)
 
-def balance_sheet_balances_check(year, month):
+def balance_sheet_balances_check():
     ''' Checks whether the Balance Sheet nets to zero in the re-mapped financial data
 
-    :param year:
-    :param month:
     :return:
     '''
-    raise NotImplementedError()
-    return False
 
+    session = db_sessionmaker()
+    qry = session.query(TableFinancialStatements, TableChartOfAccounts, TableNodeHierarchy)\
+        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.GLCode)\
+        .filter(TableChartOfAccounts.L3Code==TableNodeHierarchy.L3Code)\
+        .filter(TableNodeHierarchy.L0Name==r.CM_DATA_BALANCESHEET).all()
+    session.close()
+
+    consolidated_error_message = ""
+    is_error = False
+
+    time_periods = list(set([fs.Period for fs, coa, node in qry]))
+
+    for time_period in time_periods:
+        imbalance_check = sum([fs.Value for fs, coa, node in qry if fs.Period==time_period])
+        if imbalance_check != 0:
+            is_error = True
+            consolidated_error_message += "    Balance Sheet has imbalance of {} for period {}."\
+                                                           .format(imbalance_check, time_period.date())
+
+    if is_error:
+        raise error_objects.BalanceSheetImbalanceError("The Balance Sheet contains the following errors:\n{}"
+                                                       .format(consolidated_error_message))
 
 def master_data_integrity_check(year, month):
     ''' Performs a series of tests on the data to determine whether processes that depend on data integrity will work correctly
@@ -145,10 +175,8 @@ def master_data_integrity_check(year, month):
     :return:
     '''
 
-    # ToDo: Enforce timestamp check on previous periods to ensure that re-mapped data is aligned with Xero data
-
-    master_data_uniquesness_check()
     check_period_exists(year=year, month=month)
     check_period_is_locked(year=year, month=month)
 
-
+    master_data_uniquesness_check()
+    balance_sheet_balances_check()

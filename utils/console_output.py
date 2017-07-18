@@ -21,6 +21,8 @@ from customobjects.database_objects import TablePeriods, \
 from management_accounting.cashflow_calcs import get_all_bs_nodes_unmapped_for_cashflow
 from utils.db_connect import db_sessionmaker
 import utils.misc_functions
+import utils.data_integrity
+import customobjects.error_objects as error_objects
 
 def get_command_window_width():
     ''' Returns the width (number of columns) of the current command window as an integer
@@ -75,8 +77,6 @@ def util_output(message):
     timestamp = datetime.datetime.now()
     enhanced_message = timestamp.strftime("%I:%M:%S") + ": " + str(message)
     click.echo(enhanced_message)
-    # ToDo: Include colouration of output for error messages (needs error handling upstream?)
-
 
 def process_timestamp_validation_check(xero_date, pnl_date, alloc_date, consol_date):
     ''' Confirms that the timestamps relating to the various processes in the end-to-end chain have been run
@@ -128,11 +128,6 @@ def display_status_table():
     :return:
     '''
 
-    table_headers = ["Period", "IsLocked", "1) XeroData", "2) Converted", "3) Allocations", "4) Consol", "TimestampCheck"]
-
-    # table_rows are lists of values that correspond to the headers in the list above
-    table_rows = []
-
     session = db_sessionmaker()
 
     # Get all periods in the database up to today's date (all data is historic)
@@ -178,6 +173,11 @@ def display_status_table():
     alloc_dates = [row.Period.date() for row in alloc_qry if row.count != 0]
     consol_dates = [row.Period.date() for row in consol_qry if row.count != 0]
 
+    table_headers = ["Period", "IsLocked", "1) XeroData", "2) Converted", "3) Allocations", "4) Consol", "TimestampCheck"]
+
+    # table_rows are lists of values that correspond to the headers in the list above
+    table_rows = []
+
     for row in period_qry:
 
         # Get the timestamps of each process to check the order has been run correctly
@@ -221,7 +221,12 @@ def display_status_table():
         for row in unmapped_cashflow_nodes:
             print " " + str(row)
 
-    # ToDo: Include output for instances where master data has uniqueness failures
+    try:
+       utils.data_integrity.master_data_uniquesness_check()
+    except error_objects.MasterDataIncompleteError, e:
+        print e.message
 
-    # Check whether any balance sheet nodes aren't captured by the cash flow calculations
-    #unmapped_nodes = check_all_bs_nodes_mapped_for_cashflow()
+    try:
+        utils.data_integrity.balance_sheet_balances_check()
+    except error_objects.BalanceSheetImbalanceError, e:
+        print e.message

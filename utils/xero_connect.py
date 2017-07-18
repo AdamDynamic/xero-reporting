@@ -150,7 +150,7 @@ def check_unassigned_costcentres_is_nil(year, month):
     # Each L1 node should net to zero so that no unassigned costs are allocated to receiver cost centres
     for L1_node in L1_nodes:
         total_unallocated = abs(sum([xero.Value for xero, coa, alloc_ac in total_unassigned if coa.L1Code==L1_node]))
-        if total_unallocated > r.ALLOCATIONS_MAX_ERROR:
+        if total_unallocated > r.DEFAULT_MAX_CALC_ERROR:
             raise customobjects.error_objects.UnallocatedCostsNotNilError(
                 "Costs in cost centre '{}' for L1 node {} are not net flat (total = {})"
                     .format(rp.XERO_UNASSIGNED_CC, L1_node, total_unallocated))

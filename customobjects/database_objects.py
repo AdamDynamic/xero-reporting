@@ -76,8 +76,8 @@ class TableCostCentres(Base):
     ID = Column(Integer, primary_key=True)
     XeroName = Column(String)
     XeroCode = Column(String)
-    ClearmaticsName = Column(String)
-    ClearmaticsCode = Column(String)
+    CostCentreName = Column(String)
+    CostCentreCode = Column(String)
     AllocationTier = Column(Integer)
 
 
@@ -90,8 +90,8 @@ class TableCompanies(Base):
 
     ID = Column(Integer, primary_key=True)
     XeroName = Column(String)
-    ClearmaticsName = Column(String)
-    ClearmaticsCode = Column(Integer)
+    CompanyName = Column(String)
+    CompanyCode = Column(Integer)
 
 
 class TableFinancialStatements(Base):
@@ -103,10 +103,10 @@ class TableFinancialStatements(Base):
 
     ID = Column(Integer, primary_key=True)
     TimeStamp = Column(DateTime)
-    CompanyCode = Column(Integer, ForeignKey(r.TBL_MASTER_COMPANIES + "." + r.COL_COMPANIES_CLEARMATICSCODE))
-    CostCentreCode = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES + "." + r.COL_CC_CLEARMATICSCODE), nullable=True)
+    CompanyCode = Column(Integer, ForeignKey(r.TBL_MASTER_COMPANIES + "." + r.COL_COMPANIES_COMPCODE))
+    CostCentreCode = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES + "." + r.COL_CC_CODE), nullable=True)
     Period = Column(DateTime)
-    AccountCode = Column(Integer, ForeignKey(r.TBL_MASTER_CHARTOFACCOUNTS + "." + r.COL_CHARTACC_CLEARMATICSCODE))
+    AccountCode = Column(Integer, ForeignKey(r.TBL_MASTER_CHARTOFACCOUNTS + "." + r.COL_CHARTACC_GLCODE))
     Value = Column(Float)
 
     def __repr__(self):
@@ -140,8 +140,8 @@ class TableHeadcount(Base):
     JobTitle = Column(String)
     StartDate = Column(DateTime)
     EndDate = Column(DateTime, nullable=True)
-    CostCentre = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES+"."+r.COL_CC_CLEARMATICSCODE))
-    CompanyCode = Column(String, ForeignKey(r.TBL_MASTER_COMPANIES+"."+r.COL_COMPANIES_CLEARMATICSCODE))
+    CostCentreCode = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES + "." + r.COL_CC_CODE))
+    CompanyCode = Column(String, ForeignKey(r.TBL_MASTER_COMPANIES +"." + r.COL_COMPANIES_COMPCODE))
 
 
 class TableChartOfAccounts(Base):
@@ -152,8 +152,8 @@ class TableChartOfAccounts(Base):
     __tablename__ = r.TBL_MASTER_CHARTOFACCOUNTS
 
     ID = Column(Integer, primary_key=True)
-    ClearmaticsCode = Column(Integer)
-    ClearmaticsName = Column(String)
+    GLCode = Column(Integer)
+    GLName = Column(String)
     XeroCode = Column(String)
     XeroName = Column(String)
     L3Code = Column(String)
@@ -169,8 +169,8 @@ class TableAllocationAccounts(Base):
     __tablename__ = r.TBL_MASTER_ALLOCACCOUNTS
 
     ID = Column(Integer, primary_key=True)
-    ClearmaticsCode = Column(Integer)
-    ClearmaticsName = Column(String)
+    GLCode = Column(Integer)
+    GLName = Column(String)
     L2Hierarchy = Column(String)
     L0Code = Column(String)
     L0Name = Column(String)
@@ -191,10 +191,10 @@ class TableAllocationsData(Base):
 
     ID = Column(Integer, primary_key=True)
     DateAllocationsRun = Column(DateTime)
-    SendingCostCentre = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES+"."+r.COL_CC_CLEARMATICSCODE))
-    ReceivingCostCentre = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES+"."+r.COL_CC_CLEARMATICSCODE))
-    SendingCompany = Column(Integer, ForeignKey(r.TBL_MASTER_COMPANIES+"."+r.COL_COMPANIES_CLEARMATICSCODE))
-    ReceivingCompany = Column(Integer, ForeignKey(r.TBL_MASTER_COMPANIES+"."+r.COL_COMPANIES_CLEARMATICSCODE))
+    SendingCostCentre = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES +"." + r.COL_CC_CODE))
+    ReceivingCostCentre = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES +"." + r.COL_CC_CODE))
+    SendingCompany = Column(Integer, ForeignKey(r.TBL_MASTER_COMPANIES +"." + r.COL_COMPANIES_COMPCODE))
+    ReceivingCompany = Column(Integer, ForeignKey(r.TBL_MASTER_COMPANIES +"." + r.COL_COMPANIES_COMPCODE))
     Period = Column(DateTime)
     GLAccount = Column(Integer)
     CostHierarchy = Column(Integer)

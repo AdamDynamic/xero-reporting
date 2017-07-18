@@ -60,10 +60,10 @@ def create_internal_profit_and_loss(year, month):
             if xero_data.Value != 0:
                 new_row = TableFinancialStatements(
                                             TimeStamp = None,
-                                            CompanyCode = company.ClearmaticsCode,
-                                            CostCentreCode = costcentre.ClearmaticsCode,
+                                            CompanyCode = company.CompanyCode,
+                                            CostCentreCode = costcentre.CostCentreCode,
                                             Period = period_to_extract,
-                                            AccountCode = account.ClearmaticsCode,
+                                            AccountCode = account.GLCode,
                                             Value = (xero_data.Value * account.XeroMultiplier)  # Xero outputs all balances as positive
                                             )
                 rows_to_upload.append(new_row)
@@ -98,10 +98,10 @@ def create_internal_balance_sheet(year, month):
             if xero_data.Value != 0:
                 new_row = TableFinancialStatements(
                                             TimeStamp = None,
-                                            CompanyCode = company.ClearmaticsCode,
+                                            CompanyCode = company.CompanyCode,
                                             CostCentreCode = None,
                                             Period = period_to_extract,
-                                            AccountCode = account.ClearmaticsCode,
+                                            AccountCode = account.GLCode,
                                             Value = (xero_data.Value * account.XeroMultiplier)  # Xero outputs all balances as positive
                                             )
                 rows_to_upload.append(new_row)
@@ -175,9 +175,9 @@ def create_consolidated_financial_statements(year, month):
                                TableChartOfAccounts,
                                TableNodeHierarchy)\
         .filter(TableFinancialStatements.Period == period_to_create)\
-        .filter(TableFinancialStatements.CompanyCode == TableCompanies.ClearmaticsCode)\
-        .filter(TableFinancialStatements.CostCentreCode == TableCostCentres.ClearmaticsCode)\
-        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.ClearmaticsCode)\
+        .filter(TableFinancialStatements.CompanyCode == TableCompanies.CompanyCode)\
+        .filter(TableFinancialStatements.CostCentreCode == TableCostCentres.CostCentreCode)\
+        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.GLCode)\
         .filter(TableChartOfAccounts.L3Code == TableNodeHierarchy.L3Code)\
         .all()
 
@@ -186,17 +186,17 @@ def create_consolidated_financial_statements(year, month):
     for pnl, comp, cc, coa , node in consol_qry_cc:
         consol_row = TableConsolidatedFinStatements(
                                                     Period = period_to_create,
-                                                    CompanyCode = comp.ClearmaticsCode,
-                                                    CompanyName = comp.ClearmaticsName,
+                                                    CompanyCode = comp.CompanyCode,
+                                                    CompanyName = comp.CompanyName,
                                                     PartnerCompanyCode = None,
                                                     PartnerCompanyName = None,
-                                                    CostCentreCode = cc.ClearmaticsCode,
-                                                    CostCentreName = cc.ClearmaticsName,
+                                                    CostCentreCode = cc.CostCentreCode,
+                                                    CostCentreName = cc.CostCentreName,
                                                     PartnerCostCentreCode = None,
                                                     PartnerCostCentreName = None,
                                                     FinancialStatement = node.L0Name,
-                                                    GLAccountCode = coa.ClearmaticsCode,
-                                                    GLAccountName = coa.ClearmaticsName,
+                                                    GLAccountCode = coa.GLCode,
+                                                    GLAccountName = coa.GLName,
                                                     L1Code = node.L1Code,
                                                     L1Name = node.L1Name,
                                                     L2Code = node.L2Code,
@@ -215,9 +215,9 @@ def create_consolidated_financial_statements(year, month):
                                TableChartOfAccounts,
                                TableNodeHierarchy)\
         .filter(TableFinancialStatements.Period == period_to_create)\
-        .filter(TableFinancialStatements.CompanyCode == TableCompanies.ClearmaticsCode)\
+        .filter(TableFinancialStatements.CompanyCode == TableCompanies.CompanyCode)\
         .filter(TableFinancialStatements.CostCentreCode == None)\
-        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.ClearmaticsCode)\
+        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.GLCode)\
         .filter(TableChartOfAccounts.L3Code == TableNodeHierarchy.L3Code)\
         .all()
 
@@ -226,8 +226,8 @@ def create_consolidated_financial_statements(year, month):
     for pnl, comp, coa , node in consol_qry_nocc:
         consol_row = TableConsolidatedFinStatements(
                                                     Period = period_to_create,
-                                                    CompanyCode = comp.ClearmaticsCode,
-                                                    CompanyName = comp.ClearmaticsName,
+                                                    CompanyCode = comp.CompanyCode,
+                                                    CompanyName = comp.CompanyName,
                                                     PartnerCompanyCode = None,
                                                     PartnerCompanyName = None,
                                                     CostCentreCode = None,
@@ -235,8 +235,8 @@ def create_consolidated_financial_statements(year, month):
                                                     PartnerCostCentreCode = None,
                                                     PartnerCostCentreName = None,
                                                     FinancialStatement = node.L0Name,
-                                                    GLAccountCode = coa.ClearmaticsCode,
-                                                    GLAccountName = coa.ClearmaticsName,
+                                                    GLAccountCode = coa.GLCode,
+                                                    GLAccountName = coa.GLName,
                                                     L1Code = node.L1Code,
                                                     L1Name = node.L1Name,
                                                     L2Code = node.L2Code,
@@ -263,11 +263,11 @@ def create_consolidated_financial_statements(year, month):
                               cc_alias_receiving,
                               TableAllocationAccounts)\
         .filter(TableAllocationsData.Period==period_to_create)\
-        .filter(TableAllocationsData.SendingCompany==comp_alias_sending.ClearmaticsCode)\
-        .filter(TableAllocationsData.ReceivingCompany==comp_alias_receiving.ClearmaticsCode)\
-        .filter(TableAllocationsData.SendingCostCentre==cc_alias_sending.ClearmaticsCode)\
-        .filter(TableAllocationsData.ReceivingCostCentre==cc_alias_receiving.ClearmaticsCode)\
-        .filter(TableAllocationsData.GLAccount==TableAllocationAccounts.ClearmaticsCode)\
+        .filter(TableAllocationsData.SendingCompany==comp_alias_sending.CompanyCode)\
+        .filter(TableAllocationsData.ReceivingCompany==comp_alias_receiving.CompanyCode)\
+        .filter(TableAllocationsData.SendingCostCentre==cc_alias_sending.CostCentreCode)\
+        .filter(TableAllocationsData.ReceivingCostCentre==cc_alias_receiving.CostCentreCode)\
+        .filter(TableAllocationsData.GLAccount == TableAllocationAccounts.GLCode)\
         .all()
 
     assert alloc_qry != [], "Allocation query produced no results"
@@ -275,17 +275,17 @@ def create_consolidated_financial_statements(year, month):
     for data, comp_send, comp_rec, cc_send, cc_rec, alloc_accounts in alloc_qry:
         consol_row = TableConsolidatedFinStatements(
                                                     Period = period_to_create,
-                                                    CompanyCode = comp_rec.ClearmaticsCode,
-                                                    CompanyName = comp_rec.ClearmaticsName,
-                                                    PartnerCompanyCode = comp_send.ClearmaticsCode,
-                                                    PartnerCompanyName = comp_send.ClearmaticsName,
-                                                    CostCentreCode = cc_rec.ClearmaticsCode,
-                                                    CostCentreName = cc_rec.ClearmaticsName,
-                                                    PartnerCostCentreCode = cc_send.ClearmaticsCode,
-                                                    PartnerCostCentreName = cc_send.ClearmaticsName,
+                                                    CompanyCode = comp_rec.CompanyCode,
+                                                    CompanyName = comp_rec.CompanyName,
+                                                    PartnerCompanyCode = comp_send.CompanyCode,
+                                                    PartnerCompanyName = comp_send.CompanyName,
+                                                    CostCentreCode = cc_rec.CostCentreCode,
+                                                    CostCentreName = cc_rec.CostCentreName,
+                                                    PartnerCostCentreCode = cc_send.CostCentreCode,
+                                                    PartnerCostCentreName = cc_send.CostCentreName,
                                                     FinancialStatement = alloc_accounts.L0Name,
-                                                    GLAccountCode = alloc_accounts.ClearmaticsCode,
-                                                    GLAccountName = alloc_accounts.ClearmaticsName,
+                                                    GLAccountCode = alloc_accounts.GLCode,
+                                                    GLAccountName = alloc_accounts.GLName,
                                                     L1Code = alloc_accounts.L1Code,
                                                     L1Name = alloc_accounts.L1Name,
                                                     L2Code = alloc_accounts.L2Code,

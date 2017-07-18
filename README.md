@@ -98,6 +98,14 @@ This requires that the master data be correctly configured. The `references.py` 
 
 The calculated indirect cashflow for the period is compared to the movement in the cash balances between Balance Sheet dates to validate the calculations.
 
+## Xero Configuration
+
+The Cost Centres used in the model are configured as user-defined attributes in Xero and must be manually populated by users for all costs upon input into Xero. 
+
+The user of the model must identify the Xero ID of the attribute (looks something like `70e6c91d-3de7-2947-a542-d6f1fd741be2`) and set the `XERO_UNASSIGNED_CC` variable in `references_private.py` to this value.
+
+*Note*: The model will raise a `UnallocatedCostsNotNilError` error if the costs not assigned to a cost centre do not net to nil.
+
 ## To-Do List
 
 The following items are still outstanding:

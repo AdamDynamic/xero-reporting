@@ -5,7 +5,6 @@
 Contains functions used to calculate the cashflow statement of the company based on movements in the balance sheet
 '''
 import datetime
-
 from dateutil.relativedelta import relativedelta
 
 from customobjects import error_objects
@@ -53,7 +52,7 @@ def get_all_bs_nodes_unmapped_for_cashflow():
     qry = session.query(TableFinancialStatements,
                                 TableChartOfAccounts,
                                 TableNodeHierarchy)\
-        .filter(TableFinancialStatements.AccountCode==TableChartOfAccounts.ClearmaticsCode)\
+        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.GLCode)\
         .filter(TableChartOfAccounts.L3Code==TableNodeHierarchy.L3Code)\
         .all()
 
@@ -87,19 +86,16 @@ def calculate_cashflow_from_operations(year, month, data_rows):
         net_income = sum([row.Value for row in data_rows if row.FinancialStatement==r.CM_DATA_INCOMESTATEMENT
                           and row.CompanyCode==company and row.Period==current_period])  # ToDo: Magic numbers
         operating_cash_flow += net_income
-        print net_income
 
         # Add back depreciation (IS)
         depreciation = sum([row.Value for row in data_rows if row.L2Code==r.CM_IS_L2_DEPRECIATION
                             and row.Period==current_period and row.CompanyCode==company])
         operating_cash_flow -= depreciation
-        print depreciation
 
         # Add back deferred taxes (IS)
         deferred_tax = sum([row.Value for row in data_rows if row.L2Code == r.CM_IS_L2_DEFTAXES
                             and row.Period == current_period and row.CompanyCode==company])
         operating_cash_flow -= deferred_tax
-        print deferred_tax
 
         # For every L2 node in the Balance Sheet identified as being part of operating cash flow, calculate the
         # difference in the balance between two periods and use to adjust operating cash flow
@@ -110,7 +106,6 @@ def calculate_cashflow_from_operations(year, month, data_rows):
                                                                        bs_L2_node=cost_node,
                                                                        data_rows=data_rows)
             operating_cash_flow -= change_in_balance
-            print change_in_balance
 
         # For each company, create a row for upload to the Financial Statements table
         new_row = TableFinancialStatements(
@@ -122,8 +117,6 @@ def calculate_cashflow_from_operations(year, month, data_rows):
             Value=operating_cash_flow
         )
         rows_to_upload.append(new_row)
-
-        print "Operating: ", operating_cash_flow
 
     return rows_to_upload
 
@@ -153,7 +146,6 @@ def calculate_cashflow_from_investment(year, month, data_rows):
                                                                        bs_L2_node=cost_node,
                                                                        data_rows=data_rows)
             investment_cash_flow -= change_in_balance
-            print change_in_balance
 
         # For each company, create a row for upload to the Financial Statements table
         new_row = TableFinancialStatements(
@@ -166,7 +158,6 @@ def calculate_cashflow_from_investment(year, month, data_rows):
         )
         rows_to_upload.append(new_row)
 
-        print "Investment: ", investment_cash_flow
     return rows_to_upload
 
 def calculate_cashflow_from_financing(year, month, data_rows):
@@ -188,7 +179,6 @@ def calculate_cashflow_from_financing(year, month, data_rows):
                                                                        bs_L2_node=cost_node,
                                                                        data_rows=data_rows)
             financing_cash_flow -= change_in_balance
-            print change_in_balance
 
         # For each company, create a row for upload to the Financial Statements table
         new_row = TableFinancialStatements(
@@ -201,7 +191,6 @@ def calculate_cashflow_from_financing(year, month, data_rows):
         )
         rows_to_upload.append(new_row)
 
-        print "Financing: ", financing_cash_flow
     return rows_to_upload
 
 def create_internal_cashflow_statement(year, month):
@@ -224,7 +213,7 @@ def create_internal_cashflow_statement(year, month):
     session = db_sessionmaker()
 
     data = session.query(TableFinancialStatements, TableChartOfAccounts, TableNodeHierarchy)\
-        .filter(TableFinancialStatements.AccountCode==TableChartOfAccounts.ClearmaticsCode)\
+        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.GLCode)\
         .filter(TableChartOfAccounts.L3Code==TableNodeHierarchy.L3Code)\
         .filter(TableFinancialStatements.Period<=current_period)\
         .filter(TableFinancialStatements.Period>=prior_period)\
@@ -232,6 +221,7 @@ def create_internal_cashflow_statement(year, month):
 
     session.close()
 
+    total_cashflow = 0
     calc_rows = []
     for fs, coa, node in data:
         new_row = TableConsolidatedFinStatements(
@@ -246,8 +236,8 @@ def create_internal_cashflow_statement(year, month):
                                                 PartnerCostCentreCode = None,
                                                 PartnerCostCentreName = None,
                                                 FinancialStatement = node.L0Name,
-                                                GLAccountCode = coa.ClearmaticsCode,
-                                                GLAccountName = coa.ClearmaticsName,
+                                                GLAccountCode = coa.GLCode,
+                                                GLAccountName = coa.GLName,
                                                 L1Code = node.L1Code,
                                                 L1Name = node.L1Name,
                                                 L2Code = node.L2Code,
@@ -258,6 +248,7 @@ def create_internal_cashflow_statement(year, month):
                                                 Value = fs.Value,
                                                 TimeStamp = fs.TimeStamp
                                                 )
+        total_cashflow += fs.Value
         calc_rows.append(new_row)
 
     # Calculate the periodic movements of each cash flow statement category and create database row objects
@@ -270,17 +261,16 @@ def create_internal_cashflow_statement(year, month):
     cash_flow_rows += calculate_cashflow_from_operations(year=year, month=month, data_rows=calc_rows)
     cash_flow_rows += calculate_cashflow_from_investment(year=year, month=month, data_rows=calc_rows)
     cash_flow_rows += calculate_cashflow_from_financing(year=year, month=month, data_rows=calc_rows)
-    print "Total Calc: ", sum([row.Value for row in cash_flow_rows])
-    # Temp check:
-    total_cash = calculate_change_in_balancesheet_value(year=year, month=month, company=1000, bs_L2_node='L2A-CASH', data_rows=calc_rows)
-    print "BS Cash Difference: ", total_cash
 
-    # ToDo: Need to check whether previous period Balance Sheet is available
+    # Check that the change in cash between two periods is the same as the calculated cashflow
+    companies_to_check = [row.CompanyCode for row in cash_flow_rows]
+    for company in companies_to_check:
+        periodic_cash_change = calculate_change_in_balancesheet_value(year=year, month=month, company=company,
+                                                                      bs_L2_node=r.CM_BS_CASH, data_rows=calc_rows)
 
-    # ToDo: Perform check that calculated cash flow equals change in cash balances
+        if abs(total_cashflow-periodic_cash_change)>r.DEFAULT_MAX_CALC_ERROR:
+            raise error_objects.CashFlowCalculationError(
+                "Calculated indirect cash flow {} is different for period change in values {} for period {}.{} "
+                    .format(total_cashflow, periodic_cash_change, year, month))
 
     return cash_flow_rows
-
-
-
-#create_internal_cashflow_statement(year=2017, month=4)

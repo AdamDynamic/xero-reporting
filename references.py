@@ -13,7 +13,7 @@ AVAILABLE_PERIODS_MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12]
 
 ### Master Data Mappings
 
-COMPANY_CODE_CLEARMATICS = 1000
+COMPANY_CODE_MAINCO = 1000
 
 # Xero data mappings
 
@@ -26,7 +26,7 @@ CM_DATA_BALANCESHEET = "BalanceSheet"
 CM_DATA_INCOMESTATEMENT = "IncomeStatement"
 CM_IS_L2_DEPRECIATION = 'L2-DEP'
 CM_IS_L2_DEFTAXES = 'L2-TAXDEF'
-
+CM_BS_CASH = 'L2A-CASH'
 
 # Balance Sheet mappings (used for calculation of cash flow)
 
@@ -58,7 +58,7 @@ DEFAULT_OUTPUT_FOLDERPATH = "..[CURRENT DIRECTORY]/" + DEFAULT_OUTPUT_FOLDERNAME
 
 ### Financial Constants
 
-ALLOCATIONS_MAX_ERROR = 0.0001
+DEFAULT_MAX_CALC_ERROR = 0.0001 # The standard error tolerance used in the model's calculations
 
 ### Database Constants
 
@@ -69,10 +69,10 @@ TBL_MASTER_PERIODS = "tbl_MASTER_periods"
 COL_PERIOD_PERIOD = "Period"
 
 TBL_MASTER_COSTCENTRES = "tbl_MASTER_costcentres"
-COL_CC_CLEARMATICSCODE = "ClearmaticsCode"
+COL_CC_CODE = "CostCentreCode"
 
 TBL_MASTER_COMPANIES = "tbl_MASTER_companies"
-COL_COMPANIES_CLEARMATICSCODE = "ClearmaticsCode"
+COL_COMPANIES_COMPCODE = "CompanyCode"
 
 TBL_DATA_FINANCIALSTATEMENTS = "tbl_DATA_financialstatements"
 
@@ -81,10 +81,10 @@ COL_HEADCOUNT_COSTCENTRE = "CostCentre"
 
 TBL_MASTER_CHARTOFACCOUNTS = "tbl_MASTER_chartofaccounts"
 COL_CHARTACC_XEROCODE = "XeroCode"
-COL_CHARTACC_CLEARMATICSCODE = "ClearmaticsCode"
+COL_CHARTACC_GLCODE = "GLCode"
 
 TBL_MASTER_ALLOCACCOUNTS = "tbl_MASTER_allocationaccounts"
-COL_ALLOCACC_CODE = "ClearmaticsCode"
+COL_ALLOCACC_CODE = "GLCode"
 
 TBL_DATA_ALLOCATIONS = "tbl_DATA_allocations"
 
