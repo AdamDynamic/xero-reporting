@@ -5,18 +5,20 @@
 Contains functions used to calculate the cashflow statement of the company based on movements in the balance sheet
 '''
 import datetime
+
 from dateutil.relativedelta import relativedelta
 
+import references as r
+import utils.data_integrity
+import utils.misc_functions
 from customobjects import error_objects
 from customobjects.database_objects import \
     TableFinancialStatements, \
     TableChartOfAccounts, \
     TableNodeHierarchy, \
     TableConsolidatedFinStatements
-import references as r
-import utils.data_integrity
+from utils.data_integrity import get_all_bs_nodes_unmapped_for_cashflow
 from utils.db_connect import db_sessionmaker
-import utils.misc_functions
 
 
 def calculate_change_in_balancesheet_value(year, month, company, bs_L2_node, data_rows):
@@ -41,86 +43,7 @@ def calculate_change_in_balancesheet_value(year, month, company, bs_L2_node, dat
     change_in_balance = current_period_total - prior_period_total
     return change_in_balance
 
-def get_all_bs_nodes_unmapped_for_cashflow():
-    ''' Checks that the L2 nodes in the Balance Sheet are all captured by one of the three categories of nodes
-        (operating, investment, financing) used to calculate the cash flows of the business
-
-    :return:
-    '''
-
-    session = db_sessionmaker()
-    qry = session.query(TableFinancialStatements,
-                                TableChartOfAccounts,
-                                TableNodeHierarchy)\
-        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.GLCode)\
-        .filter(TableChartOfAccounts.L3Code==TableNodeHierarchy.L3Code)\
-        .all()
-
-    session.close()
-
-    b2_L2_nodes = list(set([node.L2Code for fs, coa, node in qry if node.L0Name==r.CM_DATA_BALANCESHEET]))
-    unmapped_nodes = []
-    for node in b2_L2_nodes:
-        if node not in r.CM_BS_L2_OPERATING:
-            if node not in r.CM_BS_L2_INVESTMENT:
-                if node not in r.CM_BS_L2_FINANCING:
-                    if node not in r.CM_BS_L2_EXCLUDED:
-                        unmapped_nodes.append(node)
-
-    return unmapped_nodes
-
-def calculate_cashflow_from_operations(year, month, data_rows):
-    ''' Uses the indirect method to calculate the indirect cash flow for a period
-
-    :param data_rows: A list of TableConsolidatedFinStatements row objects
-    :return: Float value of cash flow from operations for period given
-    '''
-
-    current_period = datetime.datetime(year=year, month=month, day=1)
-    rows_to_upload = []
-    list_of_companies = list(set([row.CompanyCode for row in data_rows]))   # Create for list of companies to future-proof
-    for company in list_of_companies:
-
-        operating_cash_flow = 0
-
-        net_income = sum([row.Value for row in data_rows if row.FinancialStatement==r.CM_DATA_INCOMESTATEMENT
-                          and row.CompanyCode==company and row.Period==current_period])  # ToDo: Magic numbers
-        operating_cash_flow += net_income
-
-        # Add back depreciation (IS)
-        depreciation = sum([row.Value for row in data_rows if row.L2Code==r.CM_IS_L2_DEPRECIATION
-                            and row.Period==current_period and row.CompanyCode==company])
-        operating_cash_flow -= depreciation
-
-        # Add back deferred taxes (IS)
-        deferred_tax = sum([row.Value for row in data_rows if row.L2Code == r.CM_IS_L2_DEFTAXES
-                            and row.Period == current_period and row.CompanyCode==company])
-        operating_cash_flow -= deferred_tax
-
-        # For every L2 node in the Balance Sheet identified as being part of operating cash flow, calculate the
-        # difference in the balance between two periods and use to adjust operating cash flow
-        for cost_node in r.CM_BS_L2_OPERATING:
-            change_in_balance = calculate_change_in_balancesheet_value(year=year,
-                                                                       month=month,
-                                                                       company=company,
-                                                                       bs_L2_node=cost_node,
-                                                                       data_rows=data_rows)
-            operating_cash_flow -= change_in_balance
-
-        # For each company, create a row for upload to the Financial Statements table
-        new_row = TableFinancialStatements(
-            TimeStamp=None,
-            CompanyCode=company,
-            CostCentreCode=None,
-            Period=current_period,
-            AccountCode=r.CM_CF_GL_OPERATING, # ToDo: Magic Number
-            Value=operating_cash_flow
-        )
-        rows_to_upload.append(new_row)
-
-    return rows_to_upload
-
-def calculate_cashflow_from_investment(year, month, data_rows):
+def calculate_cashflow_from_investment(year, month, data_rows, company_code):
     ''' Uses the indirect method to calculate the indirect cash flow for a period
 
     :param data_rows: A list of TableConsolidatedFinStatements row objects
@@ -128,70 +51,110 @@ def calculate_cashflow_from_investment(year, month, data_rows):
     '''
 
     current_period = datetime.datetime(year=year, month=month, day=1)
-    list_of_companies = list(set([row.CompanyCode for row in data_rows]))   # Create for list of companies to future-proof
     investment_cash_flow = 0
-    rows_to_upload = []
 
-    for company in list_of_companies:
+    # Add back depreciation (IS)
+    depreciation = sum([row.Value for row in data_rows if row.L2Code == r.CM_IS_L2_DEPRECIATION
+                        and row.Period == current_period and row.CompanyCode==company_code])
+    investment_cash_flow += depreciation
 
-        # Add back depreciation (IS)
-        depreciation = sum([row.Value for row in data_rows if row.L2Code == r.CM_IS_L2_DEPRECIATION
-                            and row.Period == current_period and row.CompanyCode==company])
-        investment_cash_flow -= depreciation
+    for cost_node in r.CM_BS_L2_INVESTMENT:
+        change_in_balance = calculate_change_in_balancesheet_value(year=year,
+                                                                   month=month,
+                                                                   company=company_code,
+                                                                   bs_L2_node=cost_node,
+                                                                   data_rows=data_rows)
+        investment_cash_flow -= change_in_balance
 
-        for cost_node in r.CM_BS_L2_INVESTMENT:
-            change_in_balance = calculate_change_in_balancesheet_value(year=year,
-                                                                       month=month,
-                                                                       company=company,
-                                                                       bs_L2_node=cost_node,
-                                                                       data_rows=data_rows)
-            investment_cash_flow -= change_in_balance
-
-        # For each company, create a row for upload to the Financial Statements table
-        new_row = TableFinancialStatements(
-            TimeStamp=None,
-            CompanyCode=company,
-            CostCentreCode=None,
-            Period=current_period,
-            AccountCode=r.CM_CF_GL_INVESTMENT, # ToDo: Magic Number
-            Value=investment_cash_flow
+    # For each company, create a row for upload to the Financial Statements table
+    new_row = TableFinancialStatements(
+        TimeStamp=None,
+        CompanyCode=company_code,
+        CostCentreCode=None,
+        Period=current_period,
+        AccountCode=r.CM_CF_GL_INVESTMENT, # ToDo: Magic Number
+        Value=investment_cash_flow
         )
-        rows_to_upload.append(new_row)
 
-    return rows_to_upload
+    return new_row
 
-def calculate_cashflow_from_financing(year, month, data_rows):
+def calculate_cashflow_from_financing(year, month, data_rows, company_code):
     ''' Uses the indirect method to calculate the indirect cash flow for a period
 
     :param data_rows: A list of TableConsolidatedFinStatements row objects
     :return: Float value of cash flow from financing for period given
     '''
 
-    list_of_companies = list(set([row.CompanyCode for row in data_rows]))   # Create for list of companies to future-proof
+    current_period = datetime.datetime(year=year, month=month, day=1)
     financing_cash_flow = 0
-    rows_to_upload = []
 
-    for company in list_of_companies:
-        for cost_node in r.CM_BS_L2_FINANCING:
-            change_in_balance = calculate_change_in_balancesheet_value(year=year,
-                                                                       month=month,
-                                                                       company=company,
-                                                                       bs_L2_node=cost_node,
-                                                                       data_rows=data_rows)
-            financing_cash_flow -= change_in_balance
+    # Add back amortised interest expense
+    amortised_interest = sum([row.Value for row in data_rows if row.L2Code == r.CM_IS_L2_NONCASHFINCHARGE
+                        and row.Period == current_period and row.CompanyCode==company_code])
+    financing_cash_flow += amortised_interest
 
-        # For each company, create a row for upload to the Financial Statements table
-        new_row = TableFinancialStatements(
-            TimeStamp=None,
-            CompanyCode=company,
-            CostCentreCode=None,
-            Period=datetime.datetime(year=year, month=month, day=1),
-            AccountCode=r.CM_CF_GL_FINANCING, # ToDo: Magic Number
-            Value=financing_cash_flow
-        )
-        rows_to_upload.append(new_row)
+    # Add back FX gains/losses
+    fx_gains_losses = sum([row.Value for row in data_rows if row.L2Code == r.CM_IS_L2_FX_DEBT
+                        and row.Period == current_period and row.CompanyCode==company_code])
+    financing_cash_flow += fx_gains_losses
 
-    return rows_to_upload
+    for cost_node in r.CM_BS_L2_FINANCING:
+        change_in_balance = calculate_change_in_balancesheet_value(year=year,
+                                                                   month=month,
+                                                                   company=company_code,
+                                                                   bs_L2_node=cost_node,
+                                                                   data_rows=data_rows)
+        financing_cash_flow -= change_in_balance
+
+    # For each company, create a row for upload to the Financial Statements table
+    new_row = TableFinancialStatements(
+        TimeStamp=None,
+        CompanyCode=company_code,
+        CostCentreCode=None,
+        Period=datetime.datetime(year=year, month=month, day=1),
+        AccountCode=r.CM_CF_GL_FINANCING, # ToDo: Magic Number
+        Value=financing_cash_flow
+    )
+
+    return new_row
+
+def calculate_company_cashflow(year, month, data_rows, company_code):
+    '''
+
+    :param year:
+    :param month:
+    :param data_rows:
+    :param company_code:
+    :return:
+    '''
+    current_period = datetime.datetime(year=year, month=month, day=1)
+    output_rows = []
+
+    company_data_rows = [row for row in data_rows if row.CompanyCode == company_code]
+    financing_row = calculate_cashflow_from_financing(year=year, month=month,
+                                                      data_rows=company_data_rows, company_code=company_code)
+    investment_row = calculate_cashflow_from_investment(year=year, month=month,
+                                                        data_rows=company_data_rows, company_code=company_code)
+
+    change_in_cash_balance = calculate_change_in_balancesheet_value(year=year, month=month, company=company_code,
+                                                                    bs_L2_node=r.CM_BS_CASH,
+                                                                    data_rows=company_data_rows)
+    cash_flow_from_operations = change_in_cash_balance - financing_row.Value - investment_row.Value
+
+    operations_row = TableFinancialStatements(
+        TimeStamp=None,
+        CompanyCode=company_code,
+        CostCentreCode=None,
+        Period=current_period,
+        AccountCode=r.CM_CF_GL_OPERATING,  # ToDo: Magic Number
+        Value=cash_flow_from_operations
+    )
+
+    output_rows.append(operations_row)
+    output_rows.append(financing_row)
+    output_rows.append(investment_row)
+
+    return output_rows
 
 def create_internal_cashflow_statement(year, month):
     ''' Populates TableFinancialStatements with cash flow statement lines calculated indirectly using the
@@ -221,7 +184,6 @@ def create_internal_cashflow_statement(year, month):
 
     session.close()
 
-    total_cashflow = 0
     calc_rows = []
     for fs, coa, node in data:
         new_row = TableConsolidatedFinStatements(
@@ -248,7 +210,6 @@ def create_internal_cashflow_statement(year, month):
                                                 Value = fs.Value,
                                                 TimeStamp = fs.TimeStamp
                                                 )
-        total_cashflow += fs.Value
         calc_rows.append(new_row)
 
     # Calculate the periodic movements of each cash flow statement category and create database row objects
@@ -257,20 +218,24 @@ def create_internal_cashflow_statement(year, month):
         raise error_objects.MasterDataIncompleteError("Balance sheet nodes not found in master lists:\n{}"
                                                       .format(unmapped_nodes))
 
-    cash_flow_rows = []
-    cash_flow_rows += calculate_cashflow_from_operations(year=year, month=month, data_rows=calc_rows)
-    cash_flow_rows += calculate_cashflow_from_investment(year=year, month=month, data_rows=calc_rows)
-    cash_flow_rows += calculate_cashflow_from_financing(year=year, month=month, data_rows=calc_rows)
+    list_of_companies = list(set([row.CompanyCode for row in calc_rows]))  # Create for list of companies to future-proof
 
+    cash_flow_rows = []
+    for company in list_of_companies:
+
+        cash_flow_rows += calculate_company_cashflow(year=year, month=month,
+                                                     data_rows=calc_rows, company_code=company)
     # Check that the change in cash between two periods is the same as the calculated cashflow
     companies_to_check = [row.CompanyCode for row in cash_flow_rows]
     for company in companies_to_check:
         periodic_cash_change = calculate_change_in_balancesheet_value(year=year, month=month, company=company,
                                                                       bs_L2_node=r.CM_BS_CASH, data_rows=calc_rows)
+        calculated_cash_change = sum([row.Value for row in cash_flow_rows if row.CompanyCode==company])
 
-        if abs(total_cashflow-periodic_cash_change)>r.DEFAULT_MAX_CALC_ERROR:
+        if abs(calculated_cash_change-periodic_cash_change)>r.DEFAULT_MAX_CALC_ERROR:
             raise error_objects.CashFlowCalculationError(
-                "Calculated indirect cash flow {} is different for period change in values {} for period {}.{} "
-                    .format(total_cashflow, periodic_cash_change, year, month))
+                "Calculated indirect cash flow of {} in company {} is different for period change"
+                " in values {} for period {}.{} "
+                    .format(calculated_cash_change, company, periodic_cash_change, year, month))
 
     return cash_flow_rows

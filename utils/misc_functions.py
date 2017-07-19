@@ -12,9 +12,7 @@ import os
 
 from customobjects import error_objects
 from customobjects.database_objects import \
-    TablePeriods, \
-    TableXeroExtract, \
-    TableChartOfAccounts
+    TablePeriods
 from utils.data_integrity import check_period_exists, check_period_is_locked
 from utils.db_connect import db_sessionmaker
 
@@ -70,20 +68,6 @@ def set_period_lock_status(year, month, status):
     set_lock = session.query(TablePeriods).filter(TablePeriods.Period == period_to_update).update({"IsLocked":status})
     session.commit()
     session.close()
-
-def get_unmapped_account_codes():
-    ''' Returns a summary of all Xero account codes not mapped to an internal, master Chart of Accounts code
-
-    :return:
-    '''
-
-    session = db_sessionmaker()
-    xero_data = session.query(TableXeroExtract).all()
-    coa_data = session.query(TableChartOfAccounts).all()
-    mapped_xero_codes = list(set([row.XeroCode for row in coa_data]))
-    unmapped_rows = [(row.AccountName, row.AccountCode) for row in xero_data if row.AccountCode not in mapped_xero_codes]
-    session.close()
-    return unmapped_rows
 
 def delete_table_data_for_period(table, year, month):
     ''' Deletes all data in a given table object for a specific year and month

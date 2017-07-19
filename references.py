@@ -5,9 +5,13 @@
 Contains constants and other references used by the script
 '''
 
+import datetime
+
+
 ### Time Constraints
 
 # Simple checks used to validate input before making a database request to check whether the date is in the database
+MODEL_START_DATE = datetime.datetime(year=2017, month=3, day=1) # The first period of valid data in the model
 AVAILABLE_PERIODS_YEARS = [2017,2018,2019,2020]
 AVAILABLE_PERIODS_MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12]
 
@@ -26,6 +30,9 @@ CM_DATA_BALANCESHEET = "BalanceSheet"
 CM_DATA_INCOMESTATEMENT = "IncomeStatement"
 CM_IS_L2_DEPRECIATION = 'L2-DEP'
 CM_IS_L2_DEFTAXES = 'L2-TAXDEF'
+CM_IS_L2_NONCASHFINCHARGE = 'L2-FIN-NC'
+CM_IS_L2_FX = 'L2-FX'
+CM_IS_L2_FX_DEBT = 'L2-FX-DEBT'
 CM_BS_CASH = 'L2A-CASH'
 
 # Balance Sheet mappings (used for calculation of cash flow)

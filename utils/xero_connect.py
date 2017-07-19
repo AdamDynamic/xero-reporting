@@ -255,7 +255,7 @@ def pull_xero_data_to_database(year, month):
     # ToDo: Check whether the script should close the Xero connection once it has been used
 
     # Check that the period exists and is valid
-    utils.data_integrity.master_data_integrity_check(year=year, month=month)
+    utils.data_integrity.master_data_integrity_check(year=year, month=month, check_balance_sheet=False)
 
     # Pull both the Income Statement data and Balance Sheet data from the API
     pnl_xero_data = get_xero_profit_and_loss_data(year=year, month=month)

@@ -18,11 +18,12 @@ from customobjects.database_objects import TablePeriods, \
     TableFinancialStatements, \
     TableConsolidatedFinStatements, \
     TableAllocationsData
-from management_accounting.cashflow_calcs import get_all_bs_nodes_unmapped_for_cashflow
+import customobjects.error_objects as error_objects
+from utils.data_integrity import get_all_bs_nodes_unmapped_for_cashflow
+import utils.data_integrity
 from utils.db_connect import db_sessionmaker
 import utils.misc_functions
-import utils.data_integrity
-import customobjects.error_objects as error_objects
+import references as r
 
 def get_command_window_width():
     ''' Returns the width (number of columns) of the current command window as an integer
@@ -133,6 +134,7 @@ def display_status_table():
     # Get all periods in the database up to today's date (all data is historic)
     period_qry = session.query(TablePeriods)\
         .order_by(asc(TablePeriods.Period))\
+        .filter(TablePeriods.Period >= r.MODEL_START_DATE)\
         .filter(TablePeriods.Period <= datetime.datetime.now())\
         .all()
 
@@ -178,27 +180,27 @@ def display_status_table():
     # table_rows are lists of values that correspond to the headers in the list above
     table_rows = []
 
-    for row in period_qry:
+    for qry_row in period_qry:
 
         # Get the timestamps of each process to check the order has been run correctly
         # ToDo: Refactor this so that the results aren't returned as lists
         # Results are returned as lists to capture the instance where no results are returned (returns [])
-        xero_timestamp = list(set([r.timestamp for r in xero_qry if r.Period.date()==row.Period]))
-        pnl_timestamp = list(set([r.timestamp for r in pnl_qry if r.Period.date()==row.Period]))
-        alloc_timestamp = list(set([r.timestamp for r in alloc_qry if r.Period.date()==row.Period]))
-        consol_timestamp = list(set([r.timestamp for r in consol_qry if r.Period.date()==row.Period]))
+        xero_timestamp = list(set([row.timestamp for row in xero_qry if row.Period.date()==qry_row.Period]))
+        pnl_timestamp = list(set([row.timestamp for row in pnl_qry if row.Period.date()==qry_row.Period]))
+        alloc_timestamp = list(set([row.timestamp for row in alloc_qry if row.Period.date()==qry_row.Period]))
+        consol_timestamp = list(set([row.timestamp for row in consol_qry if row.Period.date()==qry_row.Period]))
 
         validation_check = process_timestamp_validation_check(xero_date=xero_timestamp,
                                                               pnl_date=pnl_timestamp,
                                                               alloc_date=alloc_timestamp,
                                                               consol_date=consol_timestamp)
         # ToDo: Include "recalculate" requirement for instance where the TimeStampCheck shows an error
-        table_row = [row.Period,
-                      ('True' if row.IsLocked else 'False'),
-                      ('Imported' if row.Period in xero_dates else 'Not Imported'),
-                      ('Imported' if row.Period in pnl_dates else 'Not Imported'),
-                      ('Calculated' if row.Period in alloc_dates else 'Not Calculated'),
-                      ('Calculated' if row.Period in consol_dates else 'Not Calculated'),
+        table_row = [qry_row.Period,
+                      ('True' if qry_row.IsLocked else 'False'),
+                      ('Imported' if qry_row.Period in xero_dates else 'Not Imported'),
+                      ('Imported' if qry_row.Period in pnl_dates else 'Not Imported'),
+                      ('Calculated' if qry_row.Period in alloc_dates else 'Not Calculated'),
+                      ('Calculated' if qry_row.Period in consol_dates else 'Not Calculated'),
                       ('Pass' if validation_check==5 else 'Run From Step {}'.format(validation_check))
                       ]
         table_rows.append(table_row)
@@ -209,7 +211,7 @@ def display_status_table():
     print "\n" + tabulate(tabular_data=table_rows, headers=table_headers, numalign="right") + "\n"
 
     # Check whether any accounts aren't mapped to the master coa account
-    unmapped_accounts = list(set(utils.misc_functions.get_unmapped_account_codes()))
+    unmapped_accounts = list(set(utils.data_integrity.get_unmapped_xero_account_codes()))
     if unmapped_accounts:
         print "The following Xero accounts are unmapped in the chart of accounts:"
         for row in unmapped_accounts:
@@ -229,4 +231,9 @@ def display_status_table():
     try:
         utils.data_integrity.balance_sheet_balances_check()
     except error_objects.BalanceSheetImbalanceError, e:
+        print e.message
+
+    try:
+        utils.data_integrity.coa_L3_nodes_in_hierarchy()
+    except error_objects.MasterDataIncompleteError, e:
         print e.message
