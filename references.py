@@ -30,9 +30,9 @@ CM_DATA_BALANCESHEET = "BalanceSheet"
 CM_DATA_INCOMESTATEMENT = "IncomeStatement"
 CM_IS_L2_DEPRECIATION = 'L2-DEP'
 CM_IS_L2_DEFTAXES = 'L2-TAXDEF'
-CM_IS_L2_NONCASHFINCHARGE = 'L2-FIN-NC'
+CM_IS_L3_NONCASHFINCHARGE = 'L3-FIN-NC'     # Used for the calculation of cash flows from financing
 CM_IS_L2_FX = 'L2-FX'
-CM_IS_L2_FX_DEBT = 'L2-FX-DEBT'
+CM_IS_L3_FX_DEBT = 'L3-FX-DEBT'             # Used for the calculation of cash flows from financing
 CM_BS_CASH = 'L2A-CASH'
 
 # Balance Sheet mappings (used for calculation of cash flow)

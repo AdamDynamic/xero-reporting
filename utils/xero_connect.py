@@ -88,6 +88,7 @@ def get_xero_profit_and_loss_data(year, month):
     )
     return xero_data[0]
 
+
 def get_xero_balancesheet_data(year, month):
     ''' Retrieves Balance Sheet data from Xero for a specific period
 
@@ -251,9 +252,6 @@ def pull_xero_data_to_database(year, month):
     :return:
     '''
 
-    # ToDo: Insert check in instance where no Xero data exists for period
-    # ToDo: Check whether the script should close the Xero connection once it has been used
-
     # Check that the period exists and is valid
     utils.data_integrity.master_data_integrity_check(year=year, month=month, check_balance_sheet=False)
 
@@ -266,7 +264,15 @@ def pull_xero_data_to_database(year, month):
         session = db_sessionmaker()
         pnl_data_rows = parse_xero_pnl_body_data(xero_data=pnl_xero_data, list_of_cost_centres=list_of_costcentres,
                                                  year=year, month=month)
+
         bs_data_rows = parse_xero_balancesheet_body_data(xero_data=bs_xero_data, year=year, month=month)
+
+        # Data should exist for all periods in Xero
+        if not pnl_data_rows or not bs_data_rows:
+            raise customobjects.error_objects.TableEmptyForPeriodError("No data exists in Xero for period {}.{}"
+                                                                       " ({} records returned for Income Statement,"
+                                                                       " {} records returned for Balance Sheet)"
+                                                                       .format(year, month, len(pnl_data_rows), len(bs_data_rows)))
 
         utils.misc_functions.delete_table_data_for_period(table=TableXeroExtract, year=year, month=month)
 

@@ -78,14 +78,17 @@ def delete_table_data_for_period(table, year, month):
     :return:
     '''
 
-    # ToDo: Only works if the table has a field called 'Period' > need some way to check existence
-
     date_to_delete = datetime.datetime(year=year, month=month, day=1)
     check_period_is_locked(year=year, month=month)
-    session = db_sessionmaker()
-    session.query(table).filter(table.Period==date_to_delete).delete()
-    session.commit()
-    session.close()
+    try:
+        session = db_sessionmaker()
+        session.query(table).filter(table.Period==date_to_delete).delete()
+    except AttributeError, e:
+        raise error_objects.MasterDataIncompleteError(e.message + " (relevant table must have column named 'Period' for the function to work)")
+    else:
+        session.commit()
+    finally:
+        session.close()
 
 def convert_dir_path_to_standard_format(folder_path):
     ''' Standardises the folder path passed to the function

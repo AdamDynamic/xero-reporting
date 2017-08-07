@@ -103,7 +103,7 @@ def get_direct_costs_by_cc_by_node(year=None, month=None):
         .filter(TableFinancialStatements.Period == period)\
         .all()
     session.close()
-    # ToDO: Insert check that all account codes in the P&L are correctly mapped in the Chart of Accounts
+
     assert qry_costs != [], "Query in get_direct_costs_by_cc_by_node returned no results for period {}.{}".format(year, month)
     output_dict = {}
     # Get all cost centres in the extracted data
@@ -225,18 +225,21 @@ def allocate_dir_costs_for_tier(sender_costcentres, receiving_costcentres, alloc
 
     return (sender_costcentres, receiving_costcentres)
 
-def reallocate_previously_allocated_costs(sender_costcentres=None, receiving_costcentres=None, alloc_percentages=None,level=None):
+def reallocate_previously_allocated_costs(sender_costcentres=None, receiving_costcentres=None, alloc_percentages=None, level=None):
     ''' Previously allocated costs must be allocated to the next level
 
-    :param costcentres:
-    :param level:
+    :param sender_costcentres: The cost centre sending (i.e. allocating) the costs
+    :param receiving_costcentres: The cost centre receiving the allocated costs
+    :param alloc_percentages: The allocation percentages detailing what percentage of costs should be allocated to each
+            receiving cost centre by the sender cost centre
+    :param level: The hierarchy level of the allocations
     :return:
     '''
 
     for receiving_cc in receiving_costcentres:
         for sender_cc in sender_costcentres:
 
-            assert sender_cc.master_code != receiving_cc.master_code
+            assert sender_cc.master_code != receiving_cc.master_code # A cost centre can't allocate costs to itself
 
             # Only re-allocate costs from the previous allocation cycle
             indirect_costs_to_allocate = [cost for cost in sender_cc.allocated_costs if cost.cost_hierarchy==level]
@@ -277,10 +280,13 @@ def reallocate_previously_allocated_costs(sender_costcentres=None, receiving_cos
 
     # ToDo: Implement test that ensures that the allocation is net flat (need to update below to include levels)
     # for cc in sender_costcentres:
-    #     total_direct_costs = sum([cost.amount for cost in cc.direct_costs]) # ToDo: Refactor for object method?
+    #     total_direct_costs = sum([cost.amount for cost in cc.direct_costs])
     #     total_allocated_costs = sum([cost.amount for cost in cc.allocated_costs if cost.cost_hierarchy==level-1])
-    #     assert abs(total_direct_costs+total_allocated_costs)<r.ALLOCATIONS_MAX_ERROR, "Total direct costs {} not equal allocated costs {} for cc \n{}\n{}\n{}"\
-    #         .format(total_direct_costs, total_allocated_costs, cc, [cost for cost in cc.direct_costs], [cost for cost in cc.allocated_costs])
+    #     print abs(float(total_direct_costs)+float(total_allocated_costs))
+    #     assert abs(float(total_direct_costs)+float(total_allocated_costs))<r.DEFAULT_MAX_CALC_ERROR,\
+    #         "Total direct costs {} not equal allocated costs {} for cc \n{}\n{}\n{}"\
+    #         .format(total_direct_costs,
+    #                 total_allocated_costs, cc, [cost for cost in cc.direct_costs], [cost for cost in cc.allocated_costs])
 
     return (sender_costcentres, receiving_costcentres)
 
@@ -307,7 +313,7 @@ def upload_allocated_costs(costcentres):
                                         Period = cost.period,
                                         GLAccount = cost.ledger_account_code,
                                         CostHierarchy = cost.cost_hierarchy,
-                                        Value = cost.amount
+                                        Value = round(cost.amount,3)    # Rounded as database field is configured as decimal
                                         )
             session.add(row)
 
@@ -369,9 +375,9 @@ def allocate_indirect_cost_for_period(year, month):
         # need to be allocated onwards to the receiving cost centres so that the sender cost centres are still
         # net nil
         sender_costcentres, receiving_costcentres = reallocate_previously_allocated_costs(sender_costcentres=sender_costcentres,
-                                                                                receiving_costcentres=receiving_costcentres,
-                                                                                alloc_percentages=alloc_percentages,
-                                                                                level=hierarchy_level)
+                                                                                          receiving_costcentres=receiving_costcentres,
+                                                                                          alloc_percentages=alloc_percentages,
+                                                                                          level=hierarchy_level)
         # Once a cost centre has been a "sender" cost centre, it should be net flat and does not need to be
         # re-allocated
         processed_costcentres = processed_costcentres + sender_costcentres

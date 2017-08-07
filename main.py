@@ -105,7 +105,7 @@ def run_allocations(year, month):
         util_output("ERROR: Creation of cost allocations aborted")
 
 
-@fin_reporting.command(help="Creates the consolidated reporting table")
+@fin_reporting.command(help="Creates the consolidated Financial Statements table")
 @click.option('--year', type=int, help="The year of the period to create an output table for")
 @click.option('--month', type=int, help="The month of the period to create an output table for")
 def create_consolidated_table(year,month):
@@ -116,9 +116,9 @@ def create_consolidated_table(year,month):
     :return:
     '''
     try:
-        util_output("Creating consolidated Income Statement for period {}.{}...".format(year, month))
+        util_output("Creating consolidated Financial Statements for period {}.{}...".format(year, month))
         create_consolidated_financial_statements(year=year, month=month)
-        util_output("Creation of consolidated Income Statement complete")
+        util_output("Creation of consolidated Financial Statements complete")
 
     except (error_objects.PeriodIsLockedError,
             error_objects.PeriodNotFoundError,
@@ -127,7 +127,7 @@ def create_consolidated_table(year,month):
             error_objects.BalanceSheetImbalanceError,
             error_objects.CashFlowCalculationError), e:
         util_output("ERROR: {}".format(e.message))
-        util_output("ERROR: Creation of consolidated table aborted")
+        util_output("ERROR: Creation of consolidated Financial Statements aborted")
 
 
 @fin_reporting.command(help="Locks/unlocks a given period in the database")

@@ -10,12 +10,11 @@ import os
 
 import sqlalchemy
 
-import references as r
 from customobjects import error_objects
 from customobjects.database_objects import TableChartOfAccounts, TableAllocationAccounts, TableCostCentres, \
     TableCompanies, TableNodeHierarchy, TablePeriods, TableFinancialStatements, TableXeroExtract
 from utils.db_connect import db_sessionmaker
-
+import references as r
 
 def confirm_table_column_is_unique(table_object, column_name):
     ''' Confirms whether all the entries in a table column are unique (relevant for master data mappings)
@@ -250,4 +249,3 @@ def master_data_integrity_check(year, month, check_balance_sheet=True):
     coa_L3_nodes_in_hierarchy()
     if check_balance_sheet: # Where old data is overwritten, a balance sheet imbalance may be the error being corrected
         balance_sheet_balances_check()
-

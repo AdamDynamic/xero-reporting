@@ -8,17 +8,16 @@ import datetime
 
 from dateutil.relativedelta import relativedelta
 
-import references as r
-import utils.data_integrity
-import utils.misc_functions
 from customobjects import error_objects
 from customobjects.database_objects import \
     TableFinancialStatements, \
     TableChartOfAccounts, \
     TableNodeHierarchy, \
     TableConsolidatedFinStatements
-from utils.data_integrity import get_all_bs_nodes_unmapped_for_cashflow
+import utils.data_integrity
 from utils.db_connect import db_sessionmaker
+import utils.misc_functions
+import references as r
 
 
 def calculate_change_in_balancesheet_value(year, month, company, bs_L2_node, data_rows):
@@ -40,6 +39,7 @@ def calculate_change_in_balancesheet_value(year, month, company, bs_L2_node, dat
 
     prior_period_total = sum([row.Value for row in data_rows if row.L2Code == bs_L2_node
                                 and row.CompanyCode == company and row.Period == prior_period])
+
     change_in_balance = current_period_total - prior_period_total
     return change_in_balance
 
@@ -89,12 +89,12 @@ def calculate_cashflow_from_financing(year, month, data_rows, company_code):
     financing_cash_flow = 0
 
     # Add back amortised interest expense
-    amortised_interest = sum([row.Value for row in data_rows if row.L2Code == r.CM_IS_L2_NONCASHFINCHARGE
+    amortised_interest = sum([row.Value for row in data_rows if row.L3Code == r.CM_IS_L3_NONCASHFINCHARGE
                         and row.Period == current_period and row.CompanyCode==company_code])
     financing_cash_flow += amortised_interest
 
     # Add back FX gains/losses
-    fx_gains_losses = sum([row.Value for row in data_rows if row.L2Code == r.CM_IS_L2_FX_DEBT
+    fx_gains_losses = sum([row.Value for row in data_rows if row.L3Code == r.CM_IS_L3_FX_DEBT
                         and row.Period == current_period and row.CompanyCode==company_code])
     financing_cash_flow += fx_gains_losses
 
@@ -104,6 +104,7 @@ def calculate_cashflow_from_financing(year, month, data_rows, company_code):
                                                                    company=company_code,
                                                                    bs_L2_node=cost_node,
                                                                    data_rows=data_rows)
+
         financing_cash_flow -= change_in_balance
 
     # For each company, create a row for upload to the Financial Statements table
@@ -213,7 +214,7 @@ def create_internal_cashflow_statement(year, month):
         calc_rows.append(new_row)
 
     # Calculate the periodic movements of each cash flow statement category and create database row objects
-    unmapped_nodes = get_all_bs_nodes_unmapped_for_cashflow()
+    unmapped_nodes = utils.data_integrity.get_all_bs_nodes_unmapped_for_cashflow()
     if unmapped_nodes != []:
         raise error_objects.MasterDataIncompleteError("Balance sheet nodes not found in master lists:\n{}"
                                                       .format(unmapped_nodes))
@@ -222,12 +223,11 @@ def create_internal_cashflow_statement(year, month):
 
     cash_flow_rows = []
     for company in list_of_companies:
-
         cash_flow_rows += calculate_company_cashflow(year=year, month=month,
                                                      data_rows=calc_rows, company_code=company)
+
     # Check that the change in cash between two periods is the same as the calculated cashflow
-    companies_to_check = [row.CompanyCode for row in cash_flow_rows]
-    for company in companies_to_check:
+    for company in list_of_companies:
         periodic_cash_change = calculate_change_in_balancesheet_value(year=year, month=month, company=company,
                                                                       bs_L2_node=r.CM_BS_CASH, data_rows=calc_rows)
         calculated_cash_change = sum([row.Value for row in cash_flow_rows if row.CompanyCode==company])

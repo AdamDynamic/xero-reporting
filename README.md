@@ -73,9 +73,10 @@ Support functions in the business that exist to facilitate the company's commerc
 
 ### Level 3
 
-Level 3 cost centres comprise of costs used by all other areas of the business. These are:
+Level 3 cost centres includes costs used by all other areas of the business. Examples of these are:
  - Rent
  - Building service charges
+ - Business rates
  - Telecoms (e.g. the cost of the telephones, the fibre, etc)
  - The company Slack subscription
 
@@ -92,7 +93,7 @@ Level 2 allocates costs (both direct costs and indirect costs allocated to Level
 
 Level 1 does not allocate any of its direct or indirect costs. 
 
-*Costs are allocated based on the headcount of the receiving cost centres*. For example, if a L2 cost centre was allocating its costs to two L1 cost centres that had 3 and 7 heads respectively, the first L1 cost centre would receive 30% of the L2's costs, and the second L1 cost centre would receive the remaining 70%.
+*Costs are allocated based on the headcount of the receiving cost centres*. For example, if a L2 cost centre was allocating its costs to two L1 cost centres that had 3 and 7 heads respectively, the first L1 cost centre would receive 30% of the L2's costs (both Direct and Indirect), and the second L1 cost centre would receive the remaining 70%.
 
 
 ## Cashflow
