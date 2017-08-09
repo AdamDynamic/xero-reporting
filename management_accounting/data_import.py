@@ -38,7 +38,7 @@ def create_internal_profit_and_loss(year, month):
     '''
 
     # Check whether the cost centre field has been populated for all line items in the xero data
-    utils.xero_connect.check_unassigned_costcentres_is_nil(year=year, month=month)
+    utils.data_integrity.check_unassigned_costcentres_is_nil(year=year, month=month)
 
     rows_to_upload = []
     session = db_sessionmaker()
@@ -119,7 +119,8 @@ def create_internal_financial_statements(year, month):
 
     # Perform validations on the data before proceeding
     utils.data_integrity.master_data_integrity_check(year=year, month=month)
-    utils.misc_functions.check_table_has_records_for_period(year=year, month=month, table=TableXeroExtract)
+
+    utils.data_integrity.check_table_has_records_for_period(year=year, month=month, table=TableXeroExtract)
 
     # Create the P&L
     pnl_rows = create_internal_profit_and_loss(year=year, month=month)
@@ -158,8 +159,8 @@ def create_consolidated_financial_statements(year, month):
     # ToDo: Function feels too long - needs refactoring
     # Perform validation checks before proceeding
     utils.data_integrity.master_data_integrity_check(year=year, month=month)
-    utils.misc_functions.check_table_has_records_for_period(year=year, month=month, table=TableFinancialStatements)
-    utils.misc_functions.check_table_has_records_for_period(year=year, month=month, table=TableAllocationsData)
+    utils.data_integrity.check_table_has_records_for_period(year=year, month=month, table=TableFinancialStatements)
+    utils.data_integrity.check_table_has_records_for_period(year=year, month=month, table=TableAllocationsData)
 
     time_stamp = datetime.datetime.now()
     period_to_create = datetime.datetime(year=year, month=month,day=1)

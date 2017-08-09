@@ -15,6 +15,44 @@ from customobjects.database_objects import TableChartOfAccounts, TableAllocation
     TableCompanies, TableNodeHierarchy, TablePeriods, TableFinancialStatements, TableXeroExtract
 from utils.db_connect import db_sessionmaker
 import references as r
+import references_private as rp
+
+def check_unassigned_costcentres_is_nil(year, month):
+    ''' Checks that any L1 nodes that must reallocate its costs has no costs that have no cost centre allocated
+
+    :param year: Year of the period to check
+    :param month: Month of the period to check
+    :return:
+    '''
+
+    session = db_sessionmaker()
+    date_to_check = datetime.datetime(year=year, month=month, day=1)
+
+    total_unassigned = session.query(TableXeroExtract, TableChartOfAccounts, TableNodeHierarchy, TableAllocationAccounts)\
+        .filter(TableXeroExtract.AccountCode==TableChartOfAccounts.XeroCode)\
+        .filter(TableChartOfAccounts.L3Code==TableNodeHierarchy.L3Code)\
+        .filter(TableNodeHierarchy.L2Code == TableAllocationAccounts.L2Hierarchy)\
+        .filter(TableXeroExtract.CostCentreName == rp.XERO_UNASSIGNED_CC) \
+        .filter(TableXeroExtract.Period==date_to_check)\
+        .all()
+    session.close()
+
+    L1_nodes = list(set([node.L1Code for xero, coa, node, alloc_ac in total_unassigned]))
+
+    is_error = False
+    consolidated_error_message = ""
+
+    # Each L1 node should net to zero so that no unassigned costs are allocated to receiver cost centres
+    for L1_node in L1_nodes:
+        total_unallocated = sum([xero.Value for xero, coa, node, alloc_ac in total_unassigned if node.L1Code==L1_node])
+        if abs(total_unallocated) > r.DEFAULT_MAX_CALC_ERROR:
+            is_error = True
+            consolidated_error_message += "Costs in cost centre '{}' for L1 node {} are not net flat (total = {})\n"\
+                .format(rp.XERO_UNASSIGNED_CC, L1_node, total_unallocated)
+
+    if is_error:
+        raise error_objects.UnallocatedCostsNotNilError("The Xero data contains the following unassigned balances:\n{}"
+                                                        .format(consolidated_error_message))
 
 def confirm_table_column_is_unique(table_object, column_name):
     ''' Confirms whether all the entries in a table column are unique (relevant for master data mappings)
@@ -35,6 +73,24 @@ def confirm_table_column_is_unique(table_object, column_name):
         test_field.append(a[column_name])
 
     return len(test_field) == len(list(set(test_field)))
+
+def check_table_has_records_for_period(year, month, table):
+    ''' Checks whether a table contains a non-zero number of records for a given period
+
+    :param year:
+    :param month:
+    :param table:
+    :return:
+    '''
+
+    check_period_exists(year=year, month=month)
+    period_to_check = datetime.datetime(year=year, month=month, day=1)
+    session = db_sessionmaker()
+    result = session.query(table).filter(table.Period == period_to_check).all()
+    session.close()
+    if result == []:
+        raise error_objects.TableEmptyForPeriodError(
+            "Table {} contains no records for period {}.{}".format(table.__tablename__, year, month))
 
 def master_data_uniquesness_check():
     ''' Performs integrity checks on the master data in the table and raises an MasterDataIncompleteError if any
@@ -247,5 +303,6 @@ def master_data_integrity_check(year, month, check_balance_sheet=True):
 
     master_data_uniquesness_check()
     coa_L3_nodes_in_hierarchy()
+    check_unassigned_costcentres_is_nil(year=year, month=month)
     if check_balance_sheet: # Where old data is overwritten, a balance sheet imbalance may be the error being corrected
         balance_sheet_balances_check()

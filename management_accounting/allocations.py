@@ -344,7 +344,7 @@ def allocate_indirect_cost_for_period(year, month):
 
     # Perform validation checks on the data before proceeding with processing
     utils.data_integrity.master_data_integrity_check(year=year, month=month)
-    utils.misc_functions.check_table_has_records_for_period(year=year, month=month, table=TableFinancialStatements)
+    utils.data_integrity.check_table_has_records_for_period(year=year, month=month, table=TableFinancialStatements)
 
     # Get a list of cost centres populated with headcount and costs per hierarchy level
     unprocessed_costcentres = get_populated_costcentres(year=year, month=month)

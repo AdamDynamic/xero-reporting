@@ -11,13 +11,13 @@ import pprint
 from xero import Xero
 from xero.auth import PrivateCredentials
 
-import utils.data_integrity
-from customobjects.database_objects import TableXeroExtract, TableAllocationAccounts, TableChartOfAccounts
 import customobjects.error_objects
 import references as r
 import references_private as rp
-from utils.db_connect import db_sessionmaker
+import utils.data_integrity
 import utils.misc_functions
+from customobjects.database_objects import TableXeroExtract
+from utils.db_connect import db_sessionmaker
 
 
 def get_xero_instance():
@@ -88,7 +88,6 @@ def get_xero_profit_and_loss_data(year, month):
     )
     return xero_data[0]
 
-
 def get_xero_balancesheet_data(year, month):
     ''' Retrieves Balance Sheet data from Xero for a specific period
 
@@ -127,34 +126,6 @@ def get_list_of_cost_centres(xero_data):
                 for cost_centre in cells.values():
                     list_of_cost_centres.append(cost_centre)
     return list_of_cost_centres
-
-def check_unassigned_costcentres_is_nil(year, month):
-    ''' Checks that any L1 nodes that must reallocate its costs has no costs that have no cost centre allocated
-
-    :param year:
-    :param month:
-    :return:
-    '''
-
-    session = db_sessionmaker()
-    date_to_check = datetime.datetime(year=year, month=month, day=1)
-    total_unassigned = session.query(TableXeroExtract, TableChartOfAccounts, TableAllocationAccounts)\
-        .filter(TableXeroExtract.AccountCode==TableChartOfAccounts.XeroCode)\
-        .filter(TableChartOfAccounts.L3Code == TableAllocationAccounts.L2Hierarchy) \
-        .filter(TableXeroExtract.CostCentreName == rp.XERO_UNASSIGNED_CC) \
-        .filter(TableXeroExtract.Period==date_to_check)\
-        .all()
-    session.close()
-
-    L1_nodes = list(set([coa.L1Code for xero, coa, alloc_ac in total_unassigned]))
-
-    # Each L1 node should net to zero so that no unassigned costs are allocated to receiver cost centres
-    for L1_node in L1_nodes:
-        total_unallocated = abs(sum([xero.Value for xero, coa, alloc_ac in total_unassigned if coa.L1Code==L1_node]))
-        if total_unallocated > r.DEFAULT_MAX_CALC_ERROR:
-            raise customobjects.error_objects.UnallocatedCostsNotNilError(
-                "Costs in cost centre '{}' for L1 node {} are not net flat (total = {})"
-                    .format(rp.XERO_UNASSIGNED_CC, L1_node, total_unallocated))
 
 def parse_xero_pnl_body_data(xero_data, list_of_cost_centres, year, month):
     ''' Parses the Profit & Loss (split by Cost Centre) report and imports into the database

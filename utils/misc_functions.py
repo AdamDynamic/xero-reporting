@@ -33,23 +33,6 @@ def get_datetime_of_last_day_of_month(year, month):
     last_day = last_day + datetime.timedelta(days=-1)
     return last_day
 
-def check_table_has_records_for_period(year,month,table):
-    ''' Checks whether a table contains a non-zero number of records for a given period
-
-    :param year:
-    :param month:
-    :param table:
-    :return:
-    '''
-
-    check_period_exists(year=year, month=month)
-    period_to_check = datetime.datetime(year=year, month=month, day=1)
-    session = db_sessionmaker()
-    result = session.query(table).filter(table.Period==period_to_check).all()
-    session.close()
-    if result == []:
-        raise error_objects.TableEmptyForPeriodError("Table {} contains no records for period {}.{}".format(table.__tablename__, year, month))
-
 def set_period_lock_status(year, month, status):
     ''' Sets whether a period is locked or unlocked
 
