@@ -9,6 +9,7 @@ import datetime
 
 from sqlalchemy.orm import aliased
 
+from headcount import get_headcount_rows
 import references as r
 import utils.data_integrity
 import utils.misc_functions
@@ -298,6 +299,11 @@ def create_consolidated_financial_statements(year, month):
                                                     TimeStamp = time_stamp
                                                     )
         session.add(consol_row)
+
+    # Get headcount data
+    headcount_rows = get_headcount_rows(year=year, month=month, time_stamp=time_stamp)
+    for row in headcount_rows:
+        session.add(row)
 
     session.commit()
     session.close()

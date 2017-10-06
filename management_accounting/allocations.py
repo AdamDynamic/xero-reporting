@@ -162,6 +162,8 @@ def get_allocation_percentages_for_hierarchy_level(costcentres = None, hierarchy
     sender_costcentres = [cc for cc in costcentres if cc.hierarchy_tier == hierarchy_level_to_allocate]
     receiving_costcentres = [cc for cc in costcentres if cc.hierarchy_tier < hierarchy_level_to_allocate]
     total_receiving_headcount = 0
+
+    # ToDo: Refactor this to reflect FTE rather than number of heads in each cost centre
     for cc in receiving_costcentres:
         total_receiving_headcount += cc.headcount()
 

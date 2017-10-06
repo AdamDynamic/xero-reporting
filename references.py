@@ -48,7 +48,8 @@ CM_BS_L2_OPERATING = ['L2A-REC',
                    'L2L-SALARY',
                    'L2L-VAT',
                    'L2L-CONSORT',
-                   'L2L-OTHER-ST']
+                   'L2L-OTHER-ST',
+                   'L2L-OTHER-LT']
 
 CM_BS_L2_INVESTMENT = ['L2A-PPE']
 CM_BS_L2_FINANCING = ['L2L-DEBT-ST', 'L2L-DEBT-LT', 'L2E-SHAREPREM', 'L2E-PREF', 'L2E-COMMON']

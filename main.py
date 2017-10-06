@@ -43,7 +43,8 @@ def get_xero_data(year, month):
     except (error_objects.PeriodIsLockedError,
             error_objects.PeriodNotFoundError,
             error_objects.MasterDataIncompleteError,
-            error_objects.BalanceSheetImbalanceError), e:
+            error_objects.BalanceSheetImbalanceError,
+            error_objects.UnallocatedCostsNotNilError), e:
         util_output("ERROR: {}".format(e.message))
         util_output("ERROR: Import of Xero data aborted")
 

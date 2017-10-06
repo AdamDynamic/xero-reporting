@@ -138,10 +138,26 @@ class TableHeadcount(Base):
     FirstName = Column(String)
     LastName = Column(String)
     JobTitle = Column(String)
+    IsContractor = Column(Integer)
     StartDate = Column(DateTime)
     EndDate = Column(DateTime, nullable=True)
     CostCentreCode = Column(String, ForeignKey(r.TBL_MASTER_COSTCENTRES + "." + r.COL_CC_CODE))
     CompanyCode = Column(String, ForeignKey(r.TBL_MASTER_COMPANIES +"." + r.COL_COMPANIES_COMPCODE))
+    FTE = Column(Float)
+
+    def __repr__(self):
+        return "< ID: {}," \
+               " FirstName: {}," \
+               " LastName: {}," \
+               " JobTitle: {}," \
+               " IsContractor: {},"\
+               " StartDate: {}," \
+               " EndDate: {}," \
+               " CostCentre: {}," \
+               " CompanyCode: {}," \
+               " FTE: {} >"\
+            .format(self.EmployeeID, self.FirstName, self.LastName, self.JobTitle, self.IsContractor,
+                    self.StartDate, self.EndDate, self.CostCentreCode, self.CompanyCode, self.FTE)
 
 
 class TableChartOfAccounts(Base):

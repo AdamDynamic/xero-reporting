@@ -41,14 +41,13 @@ def check_unassigned_costcentres_is_nil(year, month):
 
     is_error = False
     consolidated_error_message = ""
-
     # Each L1 node should net to zero so that no unassigned costs are allocated to receiver cost centres
     for L1_node in L1_nodes:
         total_unallocated = sum([xero.Value for xero, coa, node, alloc_ac in total_unassigned if node.L1Code==L1_node])
         if abs(total_unallocated) > r.DEFAULT_MAX_CALC_ERROR:
             is_error = True
-            consolidated_error_message += "Costs in cost centre '{}' for L1 node {} are not net flat (total = {})\n"\
-                .format(rp.XERO_UNASSIGNED_CC, L1_node, total_unallocated)
+            consolidated_error_message += "Costs in cost centre '{}' for L1 node {} are not net flat for period {}.{} (total = {})\n"\
+                .format(rp.XERO_UNASSIGNED_CC, L1_node, year, month, total_unallocated)
 
     if is_error:
         raise error_objects.UnallocatedCostsNotNilError("The Xero data contains the following unassigned balances:\n{}"
@@ -290,7 +289,7 @@ def balance_sheet_balances_check():
         raise error_objects.BalanceSheetImbalanceError("The Balance Sheet contains the following errors:\n{}"
                                                        .format(consolidated_error_message))
 
-def master_data_integrity_check(year, month, check_balance_sheet=True):
+def master_data_integrity_check(year, month, check_balance_sheet=True, check_unassigned_balances=True):
     ''' Performs a series of tests on the data to determine whether processes that depend on data integrity will work correctly
 
     :param year:
@@ -303,6 +302,11 @@ def master_data_integrity_check(year, month, check_balance_sheet=True):
 
     master_data_uniquesness_check()
     coa_L3_nodes_in_hierarchy()
-    check_unassigned_costcentres_is_nil(year=year, month=month)
-    if check_balance_sheet: # Where old data is overwritten, a balance sheet imbalance may be the error being corrected
+
+    # Not necessary to check if pulling data from Xero
+    if check_unassigned_balances:
+        check_unassigned_costcentres_is_nil(year=year, month=month)
+
+    # Where old data is overwritten, a balance sheet imbalance may be the error being corrected
+    if check_balance_sheet:
         balance_sheet_balances_check()

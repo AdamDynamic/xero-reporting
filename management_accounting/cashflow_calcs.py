@@ -140,6 +140,8 @@ def calculate_company_cashflow(year, month, data_rows, company_code):
     change_in_cash_balance = calculate_change_in_balancesheet_value(year=year, month=month, company=company_code,
                                                                     bs_L2_node=r.CM_BS_CASH,
                                                                     data_rows=company_data_rows)
+
+    # ToDo: Amend to reflect cash to/from revenues, employees and other
     cash_flow_from_operations = change_in_cash_balance - financing_row.Value - investment_row.Value
 
     operations_row = TableFinancialStatements(
@@ -173,7 +175,7 @@ def create_internal_cashflow_statement(year, month):
     # to be populated in the database (throws error if the prior period doesn't exist)
     utils.data_integrity.check_period_exists(year=prior_period.year, month=prior_period.month)
 
-    # Get Income Statement and Balance Sheet split by L0 and L1 node
+    # Get all Income Statement and Balance Sheet rows split by L0 and L1 node
     session = db_sessionmaker()
 
     data = session.query(TableFinancialStatements, TableChartOfAccounts, TableNodeHierarchy)\
@@ -185,6 +187,7 @@ def create_internal_cashflow_statement(year, month):
 
     session.close()
 
+    # Populate the data into standardised Consol Fin Statement rows
     calc_rows = []
     for fs, coa, node in data:
         new_row = TableConsolidatedFinStatements(
@@ -213,12 +216,13 @@ def create_internal_cashflow_statement(year, month):
                                                 )
         calc_rows.append(new_row)
 
-    # Calculate the periodic movements of each cash flow statement category and create database row objects
+    # Check that all nodes in the standardised data are captured in the static master data
     unmapped_nodes = utils.data_integrity.get_all_bs_nodes_unmapped_for_cashflow()
     if unmapped_nodes != []:
-        raise error_objects.MasterDataIncompleteError("Balance sheet nodes not found in master lists:\n{}"
+        raise error_objects.MasterDataIncompleteError("Balance sheet nodes not found in master lists, cannot calculate cashflow:\n{}"
                                                       .format(unmapped_nodes))
 
+    # Calculate the periodic movements of each cash flow statement category and create database row objects
     list_of_companies = list(set([row.CompanyCode for row in calc_rows]))  # Create for list of companies to future-proof
 
     cash_flow_rows = []
