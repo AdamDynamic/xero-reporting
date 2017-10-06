@@ -8,6 +8,7 @@ Creates the headcount rows for the consolidated table
 import datetime
 
 from dateutil.relativedelta import relativedelta
+import references as r
 from sqlalchemy import or_
 
 from customobjects.database_objects import TableConsolidatedFinStatements, TableHeadcount,\
@@ -35,7 +36,7 @@ def get_headcount_rows(year, month, time_stamp=None):
         .filter(TableHeadcount.CompanyCode==TableCompanies.CompanyCode)\
         .filter(TableHeadcount.CostCentreCode==TableCostCentres.CostCentreCode)\
         .all()
-    session.close
+    session.close()
 
     # Want the headcount grouped by cost centre, company code,
     populated_rows = []
@@ -52,15 +53,15 @@ def get_headcount_rows(year, month, time_stamp=None):
             CostCentreName=cc.CostCentreName,
             PartnerCostCentreCode=None,
             PartnerCostCentreName=None,
-            FinancialStatement="Headcount",
-            GLAccountCode=999999,
+            FinancialStatement=r.CM_DATA_HEADCOUNT,
+            GLAccountCode=r.CM_HC_GL,
             GLAccountName=headcount.FirstName + " " + headcount.LastName + " (" + headcount.JobTitle + ")",
-            L1Code="L1-Headcount",
-            L1Name="L1-Headcount",
-            L2Code="L2-Headcount",
-            L2Name="L2-Headcount",
-            L3Code="Contractor" if headcount.IsContractor else "Permanent",
-            L3Name="Contractor" if headcount.IsContractor else "Permanent",
+            L1Code=r.CM_HC_L1,
+            L1Name=r.CM_HC_L1,
+            L2Code=r.CM_HC_L2,
+            L2Name=r.CM_HC_L2,
+            L3Code=r.HEADCOUNT_CODE_CONTRACTOR if headcount.IsContractor else r.HEADCOUNT_CODE_PERMANENT,
+            L3Name=r.HEADCOUNT_CODE_CONTRACTOR if headcount.IsContractor else r.HEADCOUNT_CODE_PERMANENT,
             CostHierarchyNumber=None,
             Value=headcount.FTE,
             TimeStamp = time_stamp if time_stamp else start_date

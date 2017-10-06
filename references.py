@@ -19,6 +19,9 @@ AVAILABLE_PERIODS_MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12]
 
 COMPANY_CODE_MAINCO = 1000
 
+HEADCOUNT_CODE_CONTRACTOR = "Contractor"
+HEADCOUNT_CODE_PERMANENT = "Permanent"
+
 # Xero data mappings
 
 XERO_DATA_BALANCESHEET = "BalanceSheet"
@@ -28,12 +31,19 @@ XERO_DATA_INCOMESTATEMENT = "ProfitAndLoss"
 
 CM_DATA_BALANCESHEET = "BalanceSheet"
 CM_DATA_INCOMESTATEMENT = "IncomeStatement"
+CM_DATA_HEADCOUNT = "Headcount"
+
 CM_IS_L2_DEPRECIATION = 'L2-DEP'
 CM_IS_L2_DEFTAXES = 'L2-TAXDEF'
 CM_IS_L3_NONCASHFINCHARGE = 'L3-FIN-NC'     # Used for the calculation of cash flows from financing
 CM_IS_L2_FX = 'L2-FX'
 CM_IS_L3_FX_DEBT = 'L3-FX-DEBT'             # Used for the calculation of cash flows from financing
+
 CM_BS_CASH = 'L2A-CASH'
+
+CM_HC_L1 = "L1-Headcount"
+CM_HC_L2 = "L2-Headcount"
+CM_HC_GL = 999999
 
 # Balance Sheet mappings (used for calculation of cash flow)
 
