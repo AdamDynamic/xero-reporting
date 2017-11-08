@@ -11,12 +11,13 @@ import pprint
 from xero import Xero
 from xero.auth import PrivateCredentials
 
+from customobjects.database_objects import TableXeroExtract
 import customobjects.error_objects
 import references as r
 import references_private as rp
 import utils.data_integrity
 import utils.misc_functions
-from customobjects.database_objects import TableXeroExtract
+
 from utils.db_connect import db_sessionmaker
 
 
@@ -224,8 +225,8 @@ def pull_xero_data_to_database(year, month):
     '''
 
     # Check that the period exists and is valid
-    utils.data_integrity.master_data_integrity_check(year=year, month=month,
-                                                     check_balance_sheet=False, check_unassigned_balances=False)
+    utils.data_integrity.master_data_integrity_check_actuals(year=year, month=month,
+                                                             check_balance_sheet=False, check_unassigned_balances=False)
 
     # Pull both the Income Statement data and Balance Sheet data from the API
     pnl_xero_data = get_xero_profit_and_loss_data(year=year, month=month)

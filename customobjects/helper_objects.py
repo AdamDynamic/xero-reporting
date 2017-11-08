@@ -15,6 +15,8 @@ class Employee(object):
         self.id = None
         self.first_name = None
         self.last_name = None
+        self.fte = None
+
         self.job_title = None
         self.start_date = None
         self.end_date = None
@@ -32,6 +34,7 @@ class Employee(object):
                "ID: {}, " \
                "FirstName: {}, " \
                "LastName: {}, " \
+               "FTE: {}, " \
                "JobTitle: {}, " \
                "StartDate: {}, " \
                "EndDate: {}, " \
@@ -42,6 +45,7 @@ class Employee(object):
                ">".format(self.id,
                           self.first_name,
                           self.last_name,
+                          self.fte,
                           self.job_title,
                           self.start_date,
                           self.end_date,
@@ -49,33 +53,6 @@ class Employee(object):
                           self.cost_centre,
                           self.company_code,
                           self.is_perm)
-
-
-class CostCentre(object):
-
-    def __init__(self):
-
-        self.xero_name = None
-        self.xero_code = None
-        self.master_name = None
-        self.master_code = None
-        self.hierarchy_tier = 0
-
-        self.employees = []
-        self.direct_costs = []              # List of Cost objects with populated Xero data
-        self.allocated_costs = []           # List of Cost objects with allocated cost data Q: how to capture source cost centre?
-
-    def headcount(self):
-        return len(self.employees)
-
-    def total_direct_costs(self):
-        return sum([c.amount for c in self.direct_costs])
-
-    def total_indirect_costs(self):
-        return sum([c.amount for c in self.allocated_costs])
-
-    def __repr__(self):
-        return "<CostCentre: Name: {}, Code: {}, Tier: {}>".format(self.master_name, self.master_code, self.hierarchy_tier)
 
 
 class Cost(object):
@@ -109,3 +86,33 @@ class Cost(object):
                     self.period,
                     self.amount)
 
+
+class CostCentre(object):
+
+    def __init__(self):
+
+        self.xero_name = None
+        self.xero_code = None
+        self.master_name = None
+        self.master_code = None
+        self.hierarchy_tier = 0
+
+        self.employees = []
+        self.direct_costs = []              # List of Cost objects with populated Xero data
+        self.allocated_costs = []           # List of Cost objects with allocated cost data Q: how to capture source cost centre?
+
+    def headcount(self):
+        return len(self.employees)
+
+    def fte(self):
+        return float(sum([emp.fte for emp in self.employees]))
+
+    def total_direct_costs(self):
+        return sum([c.amount for c in self.direct_costs])
+
+    def total_indirect_costs(self):
+        return sum([c.amount for c in self.allocated_costs])
+
+    def __repr__(self):
+        return "<CostCentre: Name: {}, Code: {}, Tier: {}>"\
+            .format(self.master_name, self.master_code, self.hierarchy_tier)

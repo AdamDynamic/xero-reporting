@@ -6,67 +6,26 @@ Contains helper and utility functions used to output messages to the command win
 '''
 
 import datetime
-import os
-import sys
 
 import click
 from tabulate import tabulate
 from sqlalchemy import func, asc
 
-from customobjects.database_objects import TablePeriods, \
+from customobjects.database_objects import \
+    TablePeriods, \
     TableXeroExtract, \
     TableFinancialStatements, \
     TableConsolidatedFinStatements, \
-    TableAllocationsData
+    TableAllocationsData, \
+    TableFinModelExtract, \
+    TableBudgetAllocationsData, \
+    TableConsolidatedBudget
 import customobjects.error_objects as error_objects
 from utils.data_integrity import get_all_bs_nodes_unmapped_for_cashflow
 import utils.data_integrity
 from utils.db_connect import db_sessionmaker
 import utils.misc_functions
 import references as r
-
-def get_command_window_width():
-    ''' Returns the width (number of columns) of the current command window as an integer
-
-    :return: The number of columns in the current command window as an integer
-    '''
-    cols = 0
-    try:
-        rows, cols = os.popen('stty size', 'r').read().split()
-    except ValueError:
-        cols = 100   # If there is no window to measure (i.e. running from IDE) then a valueerror is created
-    finally:
-        return int(cols)
-
-def progress_bar(iteration, total, prefix="", suffix="", decimals=1, number_of_cols=0):
-    ''' Displays a fixed-position progress bar in the command window
-
-    :param iteration: The current iteration of the process
-    :param total: The total number of expected iterations in the process
-    :param prefix: The prefix to be printed before the process bar in the command window
-    :param suffix: The suffix to be printed after the process bar in the command window
-    :param decimals: The number of decimal places to add to the percentage displayed
-    :param number_of_cols: The number of columns across which to display the progress bar
-    :return:
-    '''
-
-    # If the window-width is set as the default of 0, fit to the width of the current command window
-    if number_of_cols==0:
-        number_of_cols=get_command_window_width()
-
-    # Create the bar graphic
-    format_string = "{0:."+str(decimals) + "f}"
-    percent = format_string.format(100*(iteration/(total*1.0))).zfill(4+decimals)
-
-    barlength = number_of_cols - len(prefix) - len(suffix) - (10 + decimals) # Padding so the final bar doesn't wrap onto the next line
-
-    filled_length = int(round((barlength*iteration)/(total*1.0)))
-    bar = '#'*filled_length+"-"*(barlength-filled_length)
-
-    sys.stdout.write('\r{} |{}| {}{} {}'.format(prefix,bar,percent,'%',suffix))
-    if iteration==total:
-        sys.stdout.write('\n')
-    sys.stdout.flush()
 
 def util_output(message):
     ''' Outputs to the console screen and logs as an INFO message via the logging module.
@@ -79,7 +38,27 @@ def util_output(message):
     enhanced_message = timestamp.strftime("%I:%M:%S") + ": " + str(message)
     click.echo(enhanced_message)
 
-def process_timestamp_validation_check(xero_date, pnl_date, alloc_date, consol_date):
+def first_datetime_not_ascending(list_of_timestamps):
+    ''' Returns the index of the first datetime that is later than the following datetime object in the list
+
+    :param list_of_timestamps: List of timestamp objects
+    :return: The list number of the first datetime that is earlier than the previous index number
+    '''
+
+    for time_stamp in list_of_timestamps:
+
+        index_position = list_of_timestamps.index(time_stamp)
+
+        if not time_stamp: # If there is no timestamp
+            return index_position
+        elif index_position==0: # Ignore the first item on the list
+            pass
+        elif list_of_timestamps[index_position-1] >= list_of_timestamps[index_position]: # Check later than the previous timestamp
+            return index_position
+
+    return len(list_of_timestamps) # If all the tests are passed
+
+def run_actuals_from_step_number(xero_date, pnl_date, alloc_date, consol_date):
     ''' Confirms that the timestamps relating to the various processes in the end-to-end chain have been run
         in the correct order and that upstream data is current
 
@@ -123,11 +102,60 @@ def process_timestamp_validation_check(xero_date, pnl_date, alloc_date, consol_d
     else:
         return 5
 
-def display_status_table():
-    ''' Outputs to the console a summary table of the status of each reporting period
+def get_budget_status_table():
+    ''' Returns a console table showing the status of imported Budget data
 
     :return:
     '''
+
+    # 1) Create a list of all labels available in the import table
+    session = db_sessionmaker()
+    labels_qry = session.query(TableFinModelExtract.Label, TableFinModelExtract.TimeStamp, TableFinModelExtract.Comments)\
+        .order_by(asc(TableFinModelExtract.TimeStamp))\
+        .all()
+    alloc_qry = session.query(TableBudgetAllocationsData.Label, TableBudgetAllocationsData.DateAllocationsRun)\
+        .all()
+    consol_qry = session.query(TableConsolidatedBudget.Label, TableConsolidatedBudget.TimeStamp).all()
+
+    session.close()
+
+    # 2) Remove duplicates
+    labels_qry = list(set(labels_qry))
+    alloc_qry = list(set(alloc_qry))
+    consol_qry = list(set(consol_qry))
+
+    labels_allocated = [label[0] for label in alloc_qry]
+    labels_consol = [label[0] for label in consol_qry]
+    # ToDo: Include "IsPublished flag"
+    table_headers = ["Label", "IsLocked", "1) IsAllocated", "2) Consol", "TimestampCheck", "Comment"]
+    table_rows = []
+
+    # 3) Create a table row for each label imported
+    for label in labels_qry:
+
+        time_allocated = [alloc[1] for alloc in alloc_qry if alloc[0]==label[0]]
+        time_consol = [consol[1] for consol in consol_qry if consol[0]==label[0]]
+        ordered_timestamps = [time_allocated[0], time_consol[0]]
+        time_stamp_check = first_datetime_not_ascending(list_of_timestamps=ordered_timestamps)
+
+        table_row = [label[0],
+                     "N/A",
+                     ('Calculated' if label[0] in labels_allocated else 'Not Calculated'),
+                     ('Calculated' if label[0] in labels_consol else 'Not Calculated'),
+                     'Pass' if time_stamp_check == 2 else 'Run From Step {}'.format(time_stamp_check+1),
+                     label[2]]
+
+        table_rows.append(table_row)
+
+    return tabulate(tabular_data=table_rows, headers=table_headers, numalign="right") + "\n"
+
+def get_actuals_status_table():
+    ''' Creates a console window table showing the import status of the various periods of actuals available
+
+    :return:
+    '''
+
+    # ToDo: Add column with time-stamp of last operation
 
     session = db_sessionmaker()
 
@@ -169,13 +197,16 @@ def display_status_table():
         .group_by(TableConsolidatedFinStatements.Period)\
         .all()
 
+    session.close()
+
     # Convert to .date() as the data is extracted from the period_qry as datetime.date() objects
     xero_dates = [row.Period.date() for row in xero_qry if row.count != 0]
     pnl_dates = [row.Period.date() for row in pnl_qry if row.count != 0]
     alloc_dates = [row.Period.date() for row in alloc_qry if row.count != 0]
     consol_dates = [row.Period.date() for row in consol_qry if row.count != 0]
-
-    table_headers = ["Period", "IsLocked", "1) XeroData", "2) Converted", "3) Allocations", "4) Consol", "TimestampCheck"]
+    # ToDo: Include 'IsPublished' flag
+    table_headers = ["Period", "IsLocked", "1) ActualsData", "2) Converted",
+                     "3) Allocations", "4) Consol", "TimestampCheck"]
 
     # table_rows are lists of values that correspond to the headers in the list above
     table_rows = []
@@ -190,10 +221,12 @@ def display_status_table():
         alloc_timestamp = list(set([row.timestamp for row in alloc_qry if row.Period.date()==qry_row.Period]))
         consol_timestamp = list(set([row.timestamp for row in consol_qry if row.Period.date()==qry_row.Period]))
 
-        validation_check = process_timestamp_validation_check(xero_date=xero_timestamp,
-                                                              pnl_date=pnl_timestamp,
-                                                              alloc_date=alloc_timestamp,
-                                                              consol_date=consol_timestamp)
+        # Check that the time-stamps of each step are in the correct order
+        step_number_complete = run_actuals_from_step_number(xero_date=xero_timestamp,
+                                                        pnl_date=pnl_timestamp,
+                                                        alloc_date=alloc_timestamp,
+                                                        consol_date=consol_timestamp)
+
         # ToDo: Include "recalculate" requirement for instance where the TimeStampCheck shows an error
         table_row = [qry_row.Period,
                       ('True' if qry_row.IsLocked else 'False'),
@@ -201,14 +234,24 @@ def display_status_table():
                       ('Imported' if qry_row.Period in pnl_dates else 'Not Imported'),
                       ('Calculated' if qry_row.Period in alloc_dates else 'Not Calculated'),
                       ('Calculated' if qry_row.Period in consol_dates else 'Not Calculated'),
-                      ('Pass' if validation_check==5 else 'Run From Step {}'.format(validation_check))
+                      ('Pass' if step_number_complete==5 else 'Run From Step {}'.format(step_number_complete))
                       ]
         table_rows.append(table_row)
 
-    session.close()
+        # ToDo: Add col with NPAT total for the period (sense-check)
 
     # Output the table to the console
-    print "\n" + tabulate(tabular_data=table_rows, headers=table_headers, numalign="right") + "\n"
+    return tabulate(tabular_data=table_rows, headers=table_headers, numalign="right") + "\n"
+
+def display_status_table():
+    ''' Outputs to the console a summary table of the status of each reporting period
+
+    :return:
+    '''
+
+    print "##### ACTUALS DATA #####"
+    actuals_table = get_actuals_status_table()
+    print "\n" + actuals_table
 
     # Check whether any accounts aren't mapped to the master coa account
     unmapped_accounts = list(set(utils.data_integrity.get_unmapped_xero_account_codes()))
@@ -235,5 +278,15 @@ def display_status_table():
 
     try:
         utils.data_integrity.coa_L3_nodes_in_hierarchy()
+    except error_objects.MasterDataIncompleteError, e:
+        print e.message
+
+    print "##### BUDGET DATA #####"
+
+    budget_table = get_budget_status_table()
+    print "\n" + budget_table
+
+    try:
+        utils.data_integrity.check_budget_accounts_in_coa()
     except error_objects.MasterDataIncompleteError, e:
         print e.message

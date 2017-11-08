@@ -11,8 +11,16 @@ import os
 import sqlalchemy
 
 from customobjects import error_objects
-from customobjects.database_objects import TableChartOfAccounts, TableAllocationAccounts, TableCostCentres, \
-    TableCompanies, TableNodeHierarchy, TablePeriods, TableFinancialStatements, TableXeroExtract
+from customobjects.database_objects import \
+    TableChartOfAccounts, \
+    TableAllocationAccounts, \
+    TableCostCentres, \
+    TableCompanies, \
+    TableNodeHierarchy, \
+    TablePeriods, \
+    TableFinancialStatements, \
+    TableXeroExtract, \
+    TableFinModelExtract
 from utils.db_connect import db_sessionmaker
 import references as r
 import references_private as rp
@@ -72,6 +80,33 @@ def confirm_table_column_is_unique(table_object, column_name):
         test_field.append(a[column_name])
 
     return len(test_field) == len(list(set(test_field)))
+
+def check_budget_accounts_in_coa():
+    ''' Checks that the GL accounts used in the Budget data are found in the main chart of accounts
+
+    :return:
+    '''
+
+    # Get all GLs used in the Budget and in the Chart of Accounts
+    session = db_sessionmaker()
+    budget_accounts = session.query(TableFinModelExtract.GLCode).all()
+    coa_accounts = session.query(TableChartOfAccounts.GLCode).all()
+    session.close()
+
+    # Unique values only
+    budget_accounts = list(set(budget_accounts))
+
+    missing_accounts = []
+    for budget_account in budget_accounts:
+        if budget_account not in coa_accounts:
+            missing_accounts.append(budget_account)
+    if missing_accounts:
+        account_error_message = ""
+        for missing_account in missing_accounts:
+            account_error_message += str(missing_account) + "\n"
+            raise error_objects.MasterDataIncompleteError("GL Accounts included in {} are missing from the Chart of Account in {}:\n{}"
+                                                          .format(r.TBL_DATA_EXTRACT_FINMODEL, r.TBL_MASTER_CHARTOFACCOUNTS,
+                                                                  account_error_message))
 
 def check_table_has_records_for_period(year, month, table):
     ''' Checks whether a table contains a non-zero number of records for a given period
@@ -155,7 +190,7 @@ def coa_L3_nodes_in_hierarchy():
     if missing_nodes:
         node_error_message = ""
         for node in missing_nodes:
-            node_error_message += node + "\n"
+            node_error_message += str(node) + "\n"
         raise error_objects.MasterDataIncompleteError("L3 hierarchy nodes included in {} are missing from the mapping in {}:\n{}"
                                                       .format(r.TBL_MASTER_CHARTOFACCOUNTS, r.TBL_MASTER_NODEHIERARCHY, node_error_message))
 
@@ -289,7 +324,7 @@ def balance_sheet_balances_check():
         raise error_objects.BalanceSheetImbalanceError("The Balance Sheet contains the following errors:\n{}"
                                                        .format(consolidated_error_message))
 
-def master_data_integrity_check(year, month, check_balance_sheet=True, check_unassigned_balances=True):
+def master_data_integrity_check_actuals(year, month, check_balance_sheet=True, check_unassigned_balances=True):
     ''' Performs a series of tests on the data to determine whether processes that depend on data integrity will work correctly
 
     :param year:
@@ -310,3 +345,13 @@ def master_data_integrity_check(year, month, check_balance_sheet=True, check_una
     # Where old data is overwritten, a balance sheet imbalance may be the error being corrected
     if check_balance_sheet:
         balance_sheet_balances_check()
+
+def master_data_integrity_check_budget():
+    ''' Performs tests on the data integrity of the Budget data
+
+    :return:
+    '''
+
+    master_data_uniquesness_check()
+    coa_L3_nodes_in_hierarchy()
+    check_budget_accounts_in_coa()

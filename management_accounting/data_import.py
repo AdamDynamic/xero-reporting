@@ -9,11 +9,6 @@ import datetime
 
 from sqlalchemy.orm import aliased
 
-from headcount import get_headcount_rows
-import references as r
-import utils.data_integrity
-import utils.misc_functions
-import utils.xero_connect
 from customobjects import error_objects
 from customobjects.database_objects import \
     TableXeroExtract, \
@@ -25,9 +20,13 @@ from customobjects.database_objects import \
     TableAllocationsData,\
     TableAllocationAccounts,\
     TableNodeHierarchy
+from headcount import create_headcount_rows_actuals
 from management_accounting.cashflow_calcs import create_internal_cashflow_statement
-from utils.db_connect import db_sessionmaker
+import references as r
 import utils.data_integrity
+from utils.db_connect import db_sessionmaker
+import utils.misc_functions
+import utils.xero_connect
 
 
 def create_internal_profit_and_loss(year, month):
@@ -54,7 +53,7 @@ def create_internal_profit_and_loss(year, month):
     session.close()
 
     if len(query)==0:
-        raise error_objects.TableEmptyForPeriodError("No data returned from table {} for period {}.{}".format(r.TBL_DATA_XEROEXTRACT, year, month))
+        raise error_objects.TableEmptyForPeriodError("No data returned from table {} for period {}.{}".format(r.TBL_DATA_EXTRACT_XERO, year, month))
     else:
 
         for xero_data, company, costcentre, account in query:
@@ -92,7 +91,7 @@ def create_internal_balance_sheet(year, month):
     session.close()
 
     if len(query)==0:
-        raise error_objects.TableEmptyForPeriodError("No data returned from table {} for period {}.{}".format(r.TBL_DATA_XEROEXTRACT, year, month))
+        raise error_objects.TableEmptyForPeriodError("No data returned from table {} for period {}.{}".format(r.TBL_DATA_EXTRACT_XERO, year, month))
     else:
 
         for xero_data, company, account in query:
@@ -119,7 +118,7 @@ def create_internal_financial_statements(year, month):
     '''
 
     # Perform validations on the data before proceeding
-    utils.data_integrity.master_data_integrity_check(year=year, month=month)
+    utils.data_integrity.master_data_integrity_check_actuals(year=year, month=month)
 
     utils.data_integrity.check_table_has_records_for_period(year=year, month=month, table=TableXeroExtract)
 
@@ -159,15 +158,13 @@ def create_consolidated_financial_statements(year, month):
     '''
     # ToDo: Function feels too long - needs refactoring
     # Perform validation checks before proceeding
-    utils.data_integrity.master_data_integrity_check(year=year, month=month)
+    utils.data_integrity.master_data_integrity_check_actuals(year=year, month=month)
     utils.data_integrity.check_table_has_records_for_period(year=year, month=month, table=TableFinancialStatements)
     utils.data_integrity.check_table_has_records_for_period(year=year, month=month, table=TableAllocationsData)
 
     time_stamp = datetime.datetime.now()
     period_to_create = datetime.datetime(year=year, month=month,day=1)
-
-    # Delete periodic data from the table
-    utils.misc_functions.delete_table_data_for_period(table=TableConsolidatedFinStatements, year=year, month=month)
+    rows_to_import = []
 
     session = db_sessionmaker()
     # Extract the data from the Xero Income Statement
@@ -183,8 +180,46 @@ def create_consolidated_financial_statements(year, month):
         .filter(TableChartOfAccounts.L3Code == TableNodeHierarchy.L3Code)\
         .all()
 
-    assert consol_qry_cc != [], "Query of financial statement (with costcentres) data produced no results"
+    # Extract the data from the Xero financial statements (no cost centres e.g. Revenue, Balance Sheet)
+    consol_qry_nocc = session.query(TableFinancialStatements,
+                               TableCompanies,
+                               TableChartOfAccounts,
+                               TableNodeHierarchy)\
+        .filter(TableFinancialStatements.Period == period_to_create)\
+        .filter(TableFinancialStatements.CompanyCode == TableCompanies.CompanyCode)\
+        .filter(TableFinancialStatements.CostCentreCode == None)\
+        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.GLCode)\
+        .filter(TableChartOfAccounts.L3Code == TableNodeHierarchy.L3Code)\
+        .all()
 
+    # To reference a table more than once (sender, receiver cost centres) we need to alias the table
+    cc_alias_sending = aliased(TableCostCentres)
+    cc_alias_receiving = aliased(TableCostCentres)
+    comp_alias_sending = aliased(TableCompanies)
+    comp_alias_receiving = aliased(TableCompanies)
+
+    # Append the data from the cost allocations table
+    alloc_qry = session.query(TableAllocationsData,
+                              comp_alias_sending,
+                              comp_alias_receiving,
+                              cc_alias_sending,
+                              cc_alias_receiving,
+                              TableAllocationAccounts)\
+        .filter(TableAllocationsData.Period==period_to_create)\
+        .filter(TableAllocationsData.SendingCompany==comp_alias_sending.CompanyCode)\
+        .filter(TableAllocationsData.ReceivingCompany==comp_alias_receiving.CompanyCode)\
+        .filter(TableAllocationsData.SendingCostCentre==cc_alias_sending.CostCentreCode)\
+        .filter(TableAllocationsData.ReceivingCostCentre==cc_alias_receiving.CostCentreCode)\
+        .filter(TableAllocationsData.GLAccount == TableAllocationAccounts.GLCode)\
+        .all()
+
+    session.close()
+
+    assert consol_qry_cc != [], "Query of financial statement (with costcentres) data produced no results"
+    assert alloc_qry != [], "Allocation query produced no results"
+    assert consol_qry_nocc != [], "Query of financial statement data (no cost centres) produced no results"
+
+    # For data returned from the database, create ConsolidatedTable rows objects
     for pnl, comp, cc, coa , node in consol_qry_cc:
         consol_row = TableConsolidatedFinStatements(
                                                     Period = period_to_create,
@@ -207,23 +242,10 @@ def create_consolidated_financial_statements(year, month):
                                                     L3Name = node.L3Name,
                                                     CostHierarchyNumber = cc.AllocationTier,
                                                     Value = pnl.Value,
-                                                    TimeStamp = time_stamp
+                                                    TimeStamp = time_stamp,
+                                                    Label = r.OUTPUT_LABEL_ACTUALS
                                                     )
-        session.add(consol_row)
-
-    # Extract the data from the Xero financial statements (no cost centres e.g. Revenue, Balance Sheet)
-    consol_qry_nocc = session.query(TableFinancialStatements,
-                               TableCompanies,
-                               TableChartOfAccounts,
-                               TableNodeHierarchy)\
-        .filter(TableFinancialStatements.Period == period_to_create)\
-        .filter(TableFinancialStatements.CompanyCode == TableCompanies.CompanyCode)\
-        .filter(TableFinancialStatements.CostCentreCode == None)\
-        .filter(TableFinancialStatements.AccountCode == TableChartOfAccounts.GLCode)\
-        .filter(TableChartOfAccounts.L3Code == TableNodeHierarchy.L3Code)\
-        .all()
-
-    assert consol_qry_nocc != [], "Query of financial statement data (no cost centres) produced no results"
+        rows_to_import.append(consol_row)
 
     for pnl, comp, coa , node in consol_qry_nocc:
         consol_row = TableConsolidatedFinStatements(
@@ -247,32 +269,10 @@ def create_consolidated_financial_statements(year, month):
                                                     L3Name = node.L3Name,
                                                     CostHierarchyNumber = None,
                                                     Value = pnl.Value,
-                                                    TimeStamp = time_stamp
+                                                    TimeStamp = time_stamp,
+                                                    Label = r.OUTPUT_LABEL_ACTUALS
                                                     )
-        session.add(consol_row)
-
-    # To reference a table more than once (sender, receiver cost centres) we need to alias the table
-    cc_alias_sending = aliased(TableCostCentres)
-    cc_alias_receiving = aliased(TableCostCentres)
-    comp_alias_sending = aliased(TableCompanies)
-    comp_alias_receiving = aliased(TableCompanies)
-
-    # Append the data from the cost allocations table
-    alloc_qry = session.query(TableAllocationsData,
-                              comp_alias_sending,
-                              comp_alias_receiving,
-                              cc_alias_sending,
-                              cc_alias_receiving,
-                              TableAllocationAccounts)\
-        .filter(TableAllocationsData.Period==period_to_create)\
-        .filter(TableAllocationsData.SendingCompany==comp_alias_sending.CompanyCode)\
-        .filter(TableAllocationsData.ReceivingCompany==comp_alias_receiving.CompanyCode)\
-        .filter(TableAllocationsData.SendingCostCentre==cc_alias_sending.CostCentreCode)\
-        .filter(TableAllocationsData.ReceivingCostCentre==cc_alias_receiving.CostCentreCode)\
-        .filter(TableAllocationsData.GLAccount == TableAllocationAccounts.GLCode)\
-        .all()
-
-    assert alloc_qry != [], "Allocation query produced no results"
+        rows_to_import.append(consol_row)
 
     for data, comp_send, comp_rec, cc_send, cc_rec, alloc_accounts in alloc_qry:
         consol_row = TableConsolidatedFinStatements(
@@ -296,13 +296,23 @@ def create_consolidated_financial_statements(year, month):
                                                     L3Name = alloc_accounts.L3Name,
                                                     CostHierarchyNumber = data.CostHierarchy,
                                                     Value = data.Value,
-                                                    TimeStamp = time_stamp
+                                                    TimeStamp = time_stamp,
+                                                    Label = r.OUTPUT_LABEL_ACTUALS
                                                     )
-        session.add(consol_row)
+        rows_to_import.append(consol_row)
 
     # Get headcount data
-    headcount_rows = get_headcount_rows(year=year, month=month, time_stamp=time_stamp)
+    headcount_rows = create_headcount_rows_actuals(year=year, month=month, time_stamp=time_stamp)
+
     for row in headcount_rows:
+        rows_to_import.append(row)
+
+    # Delete periodic data from the table
+    utils.misc_functions.delete_table_data_for_period(table=TableConsolidatedFinStatements, year=year, month=month)
+
+    # For all rows created, add them to the database
+    session = db_sessionmaker()
+    for row in rows_to_import:
         session.add(row)
 
     session.commit()

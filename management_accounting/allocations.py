@@ -4,20 +4,23 @@
 '''
 Contains the functions used to generate indirect cost allocations
 
-Configuration assumes that indirect cost allocations are performed using headcount
+Configuration assumes that indirect cost allocations are performed using relative FTE (not headcount) in each cost centre.
 '''
 
 import datetime
 
 from sqlalchemy import or_
 
-from customobjects.database_objects import TableCostCentres, \
+from customobjects.database_objects import \
+    TableCostCentres, \
     TableFinancialStatements, \
     TableChartOfAccounts, \
     TableAllocationAccounts, \
     TableAllocationsData, \
     TableHeadcount,\
-    TableNodeHierarchy
+    TableNodeHierarchy, \
+    TableFinModelExtract, \
+    TableBudgetAllocationsData
 from customobjects.helper_objects import CostCentre, Employee, Cost
 import references as r
 from utils.db_connect import db_sessionmaker
@@ -25,8 +28,34 @@ import utils.data_integrity
 import utils.misc_functions
 
 
-def get_all_employees_from_database(year=None, month=None):
+def get_all_cost_centres_from_database():
+    ''' Returns a list of CostCentre objects populated with master data information
+
+    :param year:
+    :param month:
+    :return:
     '''
+
+    session = db_sessionmaker()
+    qry_costcentres = session.query(TableCostCentres).all()
+    session.close()
+
+    list_of_costcentres = []
+    for row in qry_costcentres:
+        cc = CostCentre()
+        cc.master_name = row.CostCentreName
+        cc.master_code = row.CostCentreCode
+        cc.hierarchy_tier = row.AllocationTier
+        cc.employees = []
+
+        list_of_costcentres.append(cc)
+
+    return list_of_costcentres
+
+### Actuals Data
+
+def get_all_actuals_employees_from_database(year, month):
+    ''' Returns a list of Employee objects based on the Actuals headcount for a given period
 
     :param year:
     :param month:
@@ -57,37 +86,14 @@ def get_all_employees_from_database(year=None, month=None):
         emp.end_date = row.EndDate
         emp.cost_centre = row.CostCentreCode
         emp.company_code = row.CompanyCode
+        emp.fte = row.FTE
 
         list_of_employees.append(emp)
 
     return list_of_employees
 
-def get_all_cost_centres_from_database():
-    '''
-
-    :param year:
-    :param month:
-    :return:
-    '''
-
-    session = db_sessionmaker()
-    qry_costcentres = session.query(TableCostCentres).all()
-    session.close()
-
-    list_of_costcentres = []
-    for row in qry_costcentres:
-        cc = CostCentre()
-        cc.master_name = row.CostCentreName
-        cc.master_code = row.CostCentreCode
-        cc.hierarchy_tier = row.AllocationTier
-        cc.employees = []
-
-        list_of_costcentres.append(cc)
-
-    return list_of_costcentres
-
-def get_direct_costs_by_cc_by_node(year=None, month=None):
-    ''' Get the direct per-cost centre costs, split by hierarchy level
+def get_direct_costs_actuals_by_cc_by_node(year, month):
+    ''' Get the direct costs (actuals) split by cost centre and L2 hierarchy level for a given period
 
     :param year:
     :param month:
@@ -104,7 +110,7 @@ def get_direct_costs_by_cc_by_node(year=None, month=None):
         .all()
     session.close()
 
-    assert qry_costs != [], "Query in get_direct_costs_by_cc_by_node returned no results for period {}.{}".format(year, month)
+    assert qry_costs != [], "Query in get_direct_costs_actuals_by_cc_by_node returned no results for period {}.{}".format(year, month)
     output_dict = {}
     # Get all cost centres in the extracted data
     list_of_costcentres = list(set([pnl.CostCentreCode for pnl, coa, node, alloc in qry_costs]))
@@ -127,8 +133,8 @@ def get_direct_costs_by_cc_by_node(year=None, month=None):
 
     return output_dict
 
-def get_populated_costcentres(year=None, month=None):
-    ''' Returns a list of cost centres populated with direct costs and employees in each cost centre
+def get_populated_costcentres_actuals(year=None, month=None):
+    ''' Returns a list of cost centres populated with actuals direct costs and employees in each cost centre
 
     :param year:
     :param month:
@@ -136,51 +142,178 @@ def get_populated_costcentres(year=None, month=None):
     '''
 
     list_of_costcentres = get_all_cost_centres_from_database()
-    list_of_employees = get_all_employees_from_database(year=year, month=month)
-    direct_costs = get_direct_costs_by_cc_by_node(year=year, month=month)
+    list_of_employees = get_all_actuals_employees_from_database(year=year, month=month)
+    direct_costs_for_period = get_direct_costs_actuals_by_cc_by_node(year=year, month=month)
 
     for cc in list_of_costcentres:
         cc.employees = [emp for emp in list_of_employees if emp.cost_centre==cc.master_code]
         try:
-            cc.direct_costs = direct_costs[cc.master_code]
+            cc.direct_costs = direct_costs_for_period[cc.master_code]
         except KeyError:
             pass # If the cost centre has no costs for that period
 
     return list_of_costcentres
 
-def get_allocation_percentages_for_hierarchy_level(costcentres = None, hierarchy_level_to_allocate = None):
-    ''' Calculates the percentages each cost centre must allocate to every other cost centre
+### Budget Data
+
+def get_all_budget_periods(label):
+    ''' Returns a list of (year, month) tuples representing all periods available in the budget data for a given label
+
+    :param label: Tag used for specfic set of Budget data
+    :return:
+    '''
+
+    session = db_sessionmaker()
+    all_dates = session.query(TableFinModelExtract.Period).filter(TableFinModelExtract.Label == label).all()
+    session.close()
+
+    # Remove all duplicates from the list of periods
+    output = list(set([(d[0].year, d[0].month) for d in all_dates]))
+    output.sort()
+    return output
+
+def get_all_budget_employees_from_database(year, month, label):
+    ''' Returns a list of Employee objects for a given period and a given Budget dataset
+
+    :param year:
+    :param month:
+    :param label:
+    :return:
+    '''
+
+    period_to_retrieve = datetime.datetime(year=year, month=month, day=1)
+
+    # Get the data from the database
+    session = db_sessionmaker()
+    # ToDo: Refactor to capture GLs for perm and contract
+    qry_headcount = session.query(TableFinModelExtract)\
+        .filter(TableFinModelExtract.Label == label)\
+        .filter(TableFinModelExtract.Period==period_to_retrieve)\
+        .filter(TableFinModelExtract.GLCode==r.CM_HC_GL)\
+        .all()
+    session.close()
+
+    list_of_employees = []
+
+    # Create a list of Employee objects that will be used for allocations
+    for row in qry_headcount:
+        emp = Employee()
+        emp.id = None
+        emp.first_name = None
+        emp.last_name = None
+        emp.fte = row.Value
+        emp.job_title = None
+        emp.start_date = None
+        emp.end_date = None
+        emp.cost_centre = row.CostCentreCode
+        emp.company_code = row.CompanyCode
+
+        list_of_employees.append(emp)
+
+    return list_of_employees
+
+def get_direct_costs_budget_by_cc_by_node(year, month, label):
+    '''
+
+    :param year:
+    :param month:
+    :param label:
+    :return:
+    '''
+    period = datetime.datetime(year=year, month=month, day=1)
+
+    session = db_sessionmaker()
+    qry_costs = session.query(TableFinModelExtract, TableChartOfAccounts, TableNodeHierarchy, TableAllocationAccounts)\
+        .filter(TableFinModelExtract.GLCode == TableChartOfAccounts.GLCode)\
+        .filter(TableChartOfAccounts.L3Code == TableNodeHierarchy.L3Code)\
+        .filter(TableNodeHierarchy.L2Code == TableAllocationAccounts.L2Hierarchy)\
+        .filter(TableFinModelExtract.Period == period)\
+        .filter(TableFinModelExtract.Label == label)\
+        .all()
+    session.close()
+
+    assert qry_costs != [], "Query in get_direct_costs_budget_by_cc_by_node for {} returned no results for period {}.{}"\
+        .format(label,year, month)
+
+    list_of_costcentres = list(set([fin.CostCentreCode for fin, coa, node, alloc in qry_costs]))
+    list_of_costcategories = list(set([(node.L2Code, alloc.GLCode) for fin, coa, node, alloc in qry_costs]))
+
+    # Create cost objects for each cost centre for each hierarchy node
+    output_dict = {}
+    for cc in list_of_costcentres: # e.g. C000001, C000002, etc
+        list_of_costs = []
+        for costcategory in list_of_costcategories: # e.g. L2-FIN, L2-STAFF, etc
+            cost = Cost()
+            cost.period = period
+            cost.master_code = costcategory[0]
+            cost.allocation_account_code = costcategory[1]
+            cost.amount = sum([pnl.Value for pnl, coa, node, alloc in qry_costs if pnl.CostCentreCode == cc and node.L2Code == costcategory[0]])
+            if abs(cost.amount) > r.DEFAULT_MAX_CALC_ERROR:    # Filter out near-zero costs to reduce number of records up-stream
+                list_of_costs.append(cost)
+        output_dict[cc]=list_of_costs
+
+    return output_dict
+
+def get_populated_costcentres_budget(year, month, label):
+    ''' Returns a list of cost centres populated with budget direct costs and employees in each cost centre
+
+    :param year:
+    :param month:
+    :param label:
+    :return:
+    '''
+
+    list_of_costcentres = get_all_cost_centres_from_database()
+    list_of_employees = get_all_budget_employees_from_database(year=year, month=month, label=label)
+    direct_costs_for_period = get_direct_costs_budget_by_cc_by_node(year=year, month=month, label=label)
+
+    for cc in list_of_costcentres:
+        cc.employees = [emp for emp in list_of_employees if emp.cost_centre==cc.master_code]
+        try:
+            cc.direct_costs = direct_costs_for_period[cc.master_code]
+        except KeyError:
+            pass # If the cost centre has no costs for that period
+
+    return list_of_costcentres
+
+### Allocate Costs (both Budget and Actuals)
+
+def get_allocation_percentages_for_hierarchy_level(costcentres, hierarchy_level_to_allocate):
+    ''' Calculates the percentages each cost centre must allocate to every other cost centre based on FTE of each cc
 
     :param hierarchy_level_to_allocate:
     :return: Nested dictionary in the form {cc1 : {cc2: 0.5, cc3: 0.4, cc4: 0.1}, cc2 : {...}
     '''
     output_dict = {}
 
-    assert costcentres is not None
-    assert hierarchy_level_to_allocate is not None
-
     sender_costcentres = [cc for cc in costcentres if cc.hierarchy_tier == hierarchy_level_to_allocate]
     receiving_costcentres = [cc for cc in costcentres if cc.hierarchy_tier < hierarchy_level_to_allocate]
-    total_receiving_headcount = 0
 
-    # ToDo: Refactor this to reflect FTE rather than number of heads in each cost centre
+    total_receiving_fte = 0
+
     for cc in receiving_costcentres:
-        total_receiving_headcount += cc.headcount()
+        total_receiving_fte += cc.fte()
 
     for sender_cc in sender_costcentres:
         receiving_dict = {}
         for reciving_cc in receiving_costcentres:
-            receiving_dict[reciving_cc.master_code] = (reciving_cc.headcount() * 1.0)/total_receiving_headcount
-        output_dict[sender_cc.master_code] = receiving_dict
+            receiving_dict[reciving_cc.master_code] = reciving_cc.fte()/total_receiving_fte
 
-        assert abs(sum([i for i in receiving_dict.values()])-1.0)<0.000001
+        # Sense check that the sending cost centre is allocating 100% of its costs
+        total_alloc_percs = sum([receiving_dict[cc] for cc in receiving_dict.keys()])
+        assert abs((total_alloc_percs - 1.0))<0.00000001,\
+            "Sum of allocation percentages {} is != 1.0:\n{}".format(total_alloc_percs, receiving_dict)
+
+        output_dict[sender_cc.master_code] = receiving_dict
 
     return output_dict
 
-def allocate_dir_costs_for_tier(sender_costcentres, receiving_costcentres, alloc_percentages,level):
+def allocate_dir_costs_for_tier(sender_costcentres, receiving_costcentres, alloc_percentages, level):
     ''' For a given allocation tier, allocate the indirect costs
 
-    :param costcentres:
+    :param sender_costcentres: A list of CostCentre objects who are having their costs allocated from them
+    :param receiving_costcentres: A list of CostCentre objects who are having costs allocated to them from the sender_costcentres
+    :param alloc_percentages: Nested dictionary in the form {cc1 : {cc2: 0.5, cc3: 0.4, cc4: 0.1}, cc2 : {...}
     :param level:
     :return:
     '''
@@ -292,64 +425,13 @@ def reallocate_previously_allocated_costs(sender_costcentres=None, receiving_cos
 
     return (sender_costcentres, receiving_costcentres)
 
-def upload_allocated_costs(costcentres):
-    '''
+def allocate_indirect_cost_for_period(unprocessed_costcentres):
+    ''' Calculates the indirect cost allocations based on headcount
 
-    :param costcentres: Cost centre objects populated with direct costs and indirect cost allocations
+    :param unprocessed_costcentres: A list of CostCentre objects, populated with headcount and direct cost information
     :return:
     '''
 
-    upload_time = datetime.datetime.now()   # Create timestamp
-
-    session = db_sessionmaker()
-
-    for cc in costcentres:
-        for cost in cc.allocated_costs:
-
-            row = TableAllocationsData(
-                                        DateAllocationsRun = upload_time,
-                                        SendingCostCentre = cost.counterparty_costcentre,
-                                        ReceivingCostCentre = cc.master_code,
-                                        SendingCompany = r.COMPANY_CODE_MAINCO, # ToDo: Refactor to make this dynamic
-                                        ReceivingCompany = r.COMPANY_CODE_MAINCO, # ToDo: Refactor to make this dynamic
-                                        Period = cost.period,
-                                        GLAccount = cost.ledger_account_code,
-                                        CostHierarchy = cost.cost_hierarchy,
-                                        Value = round(cost.amount,3)    # Rounded as database field is configured as decimal
-                                        )
-            session.add(row)
-
-    session.commit()
-    session.close()
-
-
-def allocate_indirec_cost_for_costcentre(costcentrecode, companycode, year, month):
-    # ToDo: Refactor allocate_indirect_cost_for_period to iterate over each company and each costcentre in each
-    # company to generate what will be "pre-intercompany process" balances
-    pass
-
-
-def allocate_indirect_cost_for_company(companycode, year, month):
-    # ToDo: Refactor allocate_indirect_cost_for_period to iterate over each company and each costcentre in each
-    # company to generate what will be "pre-intercompany process" balances
-    pass
-
-
-def allocate_indirect_cost_for_period(year, month):
-    ''' Calculates the indirect cost allocations based on headcount for a given period and uploads the results
-        to the management reporting database
-
-    :param year: The year of the period to run the allocation process on
-    :param month: The month of the period to run the allocation process on
-    :return:
-    '''
-
-    # Perform validation checks on the data before proceeding with processing
-    utils.data_integrity.master_data_integrity_check(year=year, month=month)
-    utils.data_integrity.check_table_has_records_for_period(year=year, month=month, table=TableFinancialStatements)
-
-    # Get a list of cost centres populated with headcount and costs per hierarchy level
-    unprocessed_costcentres = get_populated_costcentres(year=year, month=month)
     processed_costcentres = []
 
     # Iterate through each hierarchy level and allocate the costs to the cost centres on the hierarchy level above
@@ -387,5 +469,123 @@ def allocate_indirect_cost_for_period(year, month):
 
     all_costcentres = processed_costcentres + unprocessed_costcentres
 
+    return all_costcentres
+
+### Data Upload
+
+def upload_allocated_costs_actuals(costcentres):
+    '''
+
+    :param costcentres: Cost centre objects populated with direct costs and indirect cost allocations
+    :return:
+    '''
+
+    upload_time = datetime.datetime.now()   # Create timestamp
+
+    session = db_sessionmaker()
+
+    for cc in costcentres:
+        for cost in cc.allocated_costs:
+
+            row = TableAllocationsData(
+                                        DateAllocationsRun = upload_time,
+                                        SendingCostCentre = cost.counterparty_costcentre,
+                                        ReceivingCostCentre = cc.master_code,
+                                        SendingCompany = r.COMPANY_CODE_MAINCO, # ToDo: Refactor to make this dynamic
+                                        ReceivingCompany = r.COMPANY_CODE_MAINCO, # ToDo: Refactor to make this dynamic
+                                        Period = cost.period,
+                                        GLAccount = cost.ledger_account_code,
+                                        CostHierarchy = cost.cost_hierarchy,
+                                        Value = round(cost.amount,3)    # Rounded as database field is configured as decimal
+                                        )
+            session.add(row)
+
+    session.commit()
+    session.close()
+
+def upload_allocated_costs_budget(costcentres, label):
+    '''
+
+    :param costcentres: Cost centre objects populated with direct costs and indirect cost allocations
+    :return:
+    '''
+
+    upload_time = datetime.datetime.now()   # Create timestamp
+
+    session = db_sessionmaker()
+
+    for cc in costcentres:
+        for cost in cc.allocated_costs:
+
+            row = TableBudgetAllocationsData(
+                                        DateAllocationsRun = upload_time,
+                                        SendingCostCentre = cost.counterparty_costcentre,
+                                        ReceivingCostCentre = cc.master_code,
+                                        SendingCompany = r.COMPANY_CODE_MAINCO, # ToDo: Refactor to make this dynamic
+                                        ReceivingCompany = r.COMPANY_CODE_MAINCO, # ToDo: Refactor to make this dynamic
+                                        Period = cost.period,
+                                        GLAccount = cost.ledger_account_code,
+                                        CostHierarchy = cost.cost_hierarchy,
+                                        Value = round(cost.amount,3),    # Rounded as database field is configured as decimal
+                                        Label = label
+                                        )
+            session.add(row)
+
+    session.commit()
+    session.close()
+
+### Main Allocation Functions
+
+def allocate_actuals_data(year, month):
+    ''' Allocated direct costs based on headcount for a given period and uploads the results to the database
+
+    :param year:
+    :param month:
+    :return:
+    '''
+
+    # Perform validation checks on the data before proceeding with processing
+    utils.data_integrity.master_data_integrity_check_actuals(year=year, month=month)
+    utils.data_integrity.check_table_has_records_for_period(year=year, month=month, table=TableFinancialStatements)
+
+    # Get a list of cost centres populated with headcount and costs per hierarchy level
+    unprocessed_costcentres = get_populated_costcentres_actuals(year=year, month=month)
+
+    processed_costcentres = allocate_indirect_cost_for_period(unprocessed_costcentres=unprocessed_costcentres)
+
     utils.misc_functions.delete_table_data_for_period(table=TableAllocationsData, year=year, month=month)
-    upload_allocated_costs(costcentres=all_costcentres)
+    upload_allocated_costs_actuals(costcentres=processed_costcentres)
+
+def allocate_budget_data(label, max_year=9999, max_month=13):
+    ''' Creates cost allocation data for budget data for a certain budget dataset
+
+    :param label: The tag given to the budget dataset
+    :return:
+    '''
+
+    utils.data_integrity.master_data_integrity_check_budget()
+
+    # Get a list of all periods in the Budget data in the format (year, month)
+    all_periods = get_all_budget_periods(label=label)
+    all_processed_costcentres = []
+
+    for year, month in all_periods:
+        # To prevent large volumes of unnecessary data being generated, the period over which allocations
+        # are run can be limited by the user
+        if year<=max_year and month<=max_month:
+            unprocessed_costcentres = get_populated_costcentres_budget(year=year, month=month, label=label)
+            processed_costcentres = allocate_indirect_cost_for_period(unprocessed_costcentres=unprocessed_costcentres)
+            all_processed_costcentres += processed_costcentres
+        else:
+            break
+
+    # Delete previously allocated data (for the relevant period only)
+    session = db_sessionmaker()
+    session.query(TableBudgetAllocationsData) \
+        .filter(TableBudgetAllocationsData.Label == label) \
+        .delete()
+    session.commit()
+    session.close()
+
+    # Upload new data
+    upload_allocated_costs_budget(costcentres=all_processed_costcentres, label=label)

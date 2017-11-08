@@ -19,8 +19,11 @@ AVAILABLE_PERIODS_MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12]
 
 COMPANY_CODE_MAINCO = 1000
 
-HEADCOUNT_CODE_CONTRACTOR = "Contractor"
-HEADCOUNT_CODE_PERMANENT = "Permanent"
+HEADCOUNT_CODE_CONTRACTOR = "L3HC-CONT"
+HEADCOUNT_CODE_PERMANENT = "L3HC-PERM"
+
+HEADCOUNT_NAME_CONTRACTOR = "headcount-contract"
+HEADCOUNT_NAME_PERMANENT = "headcount-permanent"
 
 # Xero data mappings
 
@@ -43,7 +46,9 @@ CM_BS_CASH = 'L2A-CASH'
 
 CM_HC_L1 = "L1-Headcount"
 CM_HC_L2 = "L2-Headcount"
-CM_HC_GL = 999999
+CM_HC_GL = 999999 # ToDo: Refactor to capture GLs for Perm and Contract headcount
+
+OUTPUT_LABEL_ACTUALS = "actuals"
 
 # Balance Sheet mappings (used for calculation of cash flow)
 
@@ -69,44 +74,51 @@ CM_CF_GL_OPERATING = 900010
 CM_CF_GL_INVESTMENT = 900020
 CM_CF_GL_FINANCING = 900030
 
-### Output Constants
-
-DEFAULT_OUTPUT_FOLDERNAME = "fin-data-output"
-DEFAULT_OUTPUT_FOLDERPATH = "..[CURRENT DIRECTORY]/" + DEFAULT_OUTPUT_FOLDERNAME
-
 ### Financial Constants
 
 DEFAULT_MAX_CALC_ERROR = 0.0001 # The standard error tolerance used in the model's calculations
 
 ### Database Constants
 
-TBL_DATA_XEROEXTRACT = "tbl_DATA_xeroextract"
-COL_XEROEXTRACT_ACCOUNTCODE = "AccountCode"
+#### Master Data
 
-TBL_MASTER_PERIODS = "tbl_MASTER_periods"
-COL_PERIOD_PERIOD = "Period"
-
-TBL_MASTER_COSTCENTRES = "tbl_MASTER_costcentres"
-COL_CC_CODE = "CostCentreCode"
-
-TBL_MASTER_COMPANIES = "tbl_MASTER_companies"
-COL_COMPANIES_COMPCODE = "CompanyCode"
-
-TBL_DATA_FINANCIALSTATEMENTS = "tbl_DATA_financialstatements"
-
-TBL_MASTER_HEADCOUNT = "tbl_MASTER_headcount"
-COL_HEADCOUNT_COSTCENTRE = "CostCentre"
+TBL_MASTER_ALLOCACCOUNTS = "tbl_MASTER_allocationaccounts"
+COL_ALLOCACC_CODE = "GLCode"
 
 TBL_MASTER_CHARTOFACCOUNTS = "tbl_MASTER_chartofaccounts"
 COL_CHARTACC_XEROCODE = "XeroCode"
 COL_CHARTACC_GLCODE = "GLCode"
 
-TBL_MASTER_ALLOCACCOUNTS = "tbl_MASTER_allocationaccounts"
-COL_ALLOCACC_CODE = "GLCode"
+TBL_MASTER_COMPANIES = "tbl_MASTER_companies"
+COL_COMPANIES_COMPCODE = "CompanyCode"
 
-TBL_DATA_ALLOCATIONS = "tbl_DATA_allocations"
+TBL_MASTER_COSTCENTRES = "tbl_MASTER_costcentres"
+COL_CC_CODE = "CostCentreCode"
 
-TBL_OUTPUT_CONSOL_FINSTAT = "tbl_OUTPUT_consolidated_finstat"
+TBL_MASTER_PERIODS = "tbl_MASTER_periods"
+COL_PERIOD_PERIOD = "Period"
 
 TBL_MASTER_NODEHIERARCHY = "tbl_MASTER_nodehierarchy"
 COL_NODE_L3CODE = "L3Code"
+
+#### User Data
+
+TBL_DATA_ALLOCATIONS_ACTUALS = "tbl_DATA_allocations_actuals"
+
+TBL_DATA_ALLOCATIONS_BUDGET = "tbl_DATA_allocations_budget"
+
+TBL_DATA_HEADCOUNT_ACTUALS = "tbl_DATA_headcount_actuals"
+COL_HEADCOUNT_COSTCENTRE = "CostCentre"
+
+TBL_DATA_EXTRACT_FINMODEL = "tbl_DATA_extract_finmodel"
+
+TBL_DATA_CONVERTED_ACTUALS = "tbl_DATA_converted_actuals"
+
+TBL_DATA_EXTRACT_XERO = "tbl_DATA_extract_xero"
+COL_XEROEXTRACT_ACCOUNTCODE = "AccountCode"
+
+#### Output Data
+
+TBL_OUTPUT_CONSOL_ACTUALS = "tbl_OUTPUT_consolidated_actuals"
+
+TBL_OUTPUT_CONSOL_BUDGET = "tbl_OUTPUT_consolidated_budget"

@@ -13,23 +13,23 @@ Note also that the `--help` function works for all commands in the interface.
 
 To create a valid dataset the commands below must be run *in order*. It is recommended that the output for each stage be checked before the next stage is processed:
 
-1. `get_xero_data`
+1. `actuals_get_data`
 
 Retrieves financial data from the company Xero instance and imports it into the database. Options are `--year` and `--month` to set the period you want to pull into the database.
 
-2. `convert_xero_data`
+2. `actuals_convert_data`
 
 Re-maps the imported Xero reporting data to standardised internal company master data mappings. Options are `--year` and `--month` to set the period you want to convert.
 
-3. `run_allocations`
+3. `actuals_run_allocations`
 
 Runs the cost allocation process on the direct costs of support functions. Options are `--year` and `--month` to set the period you want to run allocations on.
 
-4. `create_consolidated_table`
+4. `actuals_create_consol_table`
 
-Creates a user-readable Income Statement that combines both the Xero data (converted to master data mappings of the user company) and the allocated cost data. Options are `--year` and `--month` to set the period you want to create the consolidated table for.
+Creates user-readable financial statements that combines both the Xero data (converted to master data mappings of the user company) and the allocated cost data. Options are `--year` and `--month` to set the period you want to create the consolidated table for.
 
-Once `get_xero_data`, `convert_xero_data`, `run_allocations` and `create_consolidated_table` have been run (*in that order*) then the data is ready to be reported on. See the `status` function below for user visibility on whether the process has been run correctly.
+Once `actuals_get_data`, `actuals_convert_data`, `actuals_run_allocations` and `actuals_create_consol_table` have been run (*in that order*) then the data is ready to be reported on. See the `status` function below for user visibility on whether the process has been run correctly.
 
 ### Other Functions
 
@@ -121,4 +121,5 @@ The following items are still outstanding:
 3. Unit testing for `cashflow_calcs.py` module.
 4. Include descriptions of the tables in the README file.
 5. The model doesn't include any provision for intercompany recharges.
+6. Document budget data functionality
 

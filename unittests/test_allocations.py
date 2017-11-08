@@ -33,17 +33,17 @@ class Test_Allocations(unittest.TestCase):
         :return:
         '''
 
-        test_result = allocations.get_all_employees_from_database(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
+        test_result = allocations.get_all_actuals_employees_from_database(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
         for object in test_result:
             self.assertIsInstance(object, Employee)
 
-    def test_get_direct_costs_by_cc_by_node_returns_dict(self):
+    def test_get_direct_costs_actuals_by_cc_by_node_returns_dict(self):
         ''' get_direct_costs_by_cc_by_node returns dictionary where each item is a list of Cost objects
 
         :return:
         '''
 
-        test_result = allocations.get_direct_costs_by_cc_by_node(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
+        test_result = allocations.get_direct_costs_actuals_by_cc_by_node(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
         self.assertIsInstance(test_result, dict)
 
         # Test that each key in the dictionary relates to a list of cost objects
@@ -51,31 +51,31 @@ class Test_Allocations(unittest.TestCase):
             for object in test_result[key]:
                 self.assertIsInstance(object, Cost)
 
-    def test_get_populated_costcentres_returns_costcentres(self):
+    def test_get_populated_costcentres_returns_costcentres_actuals(self):
         ''' get_populated_costcentres returns a list of cost centre objects
 
         :return:
         '''
 
-        test_result = allocations.get_populated_costcentres(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
+        test_result = allocations.get_populated_costcentres_actuals(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
 
         # Confirm that each object returned is a CostCentre object
         for object in test_result:
             self.assertIsInstance(object, CostCentre)
 
-    def test_get_populated_costcentres_returns_complete_list(self):
+    def test_get_populated_costcentres_actuals_returns_complete_list(self):
         ''' get_populated_costcentres should return cost centres that capture all costs
 
         :return:
         '''
 
-        test_costcentres = allocations.get_populated_costcentres(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
+        test_costcentres = allocations.get_populated_costcentres_actuals(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
 
         total_costcentre_costs = 0
         for cc in test_costcentres:
             total_costcentre_costs += sum([cost.amount for cost in cc.direct_costs])
 
-        total_nodes = allocations.get_direct_costs_by_cc_by_node(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
+        total_nodes = allocations.get_direct_costs_actuals_by_cc_by_node(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
 
         total_node_costs = 0
         for cc in total_nodes.keys():
@@ -89,7 +89,7 @@ class Test_Allocations(unittest.TestCase):
         :return:
         '''
 
-        populated_costcentres = allocations.get_populated_costcentres(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
+        populated_costcentres = allocations.get_populated_costcentres_actuals(year=TEST_PERIOD_YEAR, month=TEST_PERIOD_MONTH)
 
         hierarchy_levels = [cc.hierarchy_tier for cc in populated_costcentres]
 

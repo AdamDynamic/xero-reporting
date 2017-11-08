@@ -8,15 +8,18 @@ Creates the headcount rows for the consolidated table
 import datetime
 
 from dateutil.relativedelta import relativedelta
-import references as r
 from sqlalchemy import or_
 
-from customobjects.database_objects import TableConsolidatedFinStatements, TableHeadcount,\
-    TableCompanies, TableCostCentres
+from customobjects.database_objects import \
+    TableConsolidatedFinStatements, \
+    TableHeadcount,\
+    TableCompanies, \
+    TableCostCentres
+import references as r
 from utils.db_connect import db_sessionmaker
 
 
-def get_headcount_rows(year, month, time_stamp=None):
+def create_headcount_rows_actuals(year, month, time_stamp=None):
     ''' Creates rows for the Consolidated Financial Statement table that reflects headcount for the period
 
     :param year: Year for the period to get headcount for
@@ -61,10 +64,11 @@ def get_headcount_rows(year, month, time_stamp=None):
             L2Code=r.CM_HC_L2,
             L2Name=r.CM_HC_L2,
             L3Code=r.HEADCOUNT_CODE_CONTRACTOR if headcount.IsContractor else r.HEADCOUNT_CODE_PERMANENT,
-            L3Name=r.HEADCOUNT_CODE_CONTRACTOR if headcount.IsContractor else r.HEADCOUNT_CODE_PERMANENT,
+            L3Name=r.HEADCOUNT_NAME_CONTRACTOR if headcount.IsContractor else r.HEADCOUNT_NAME_PERMANENT,
             CostHierarchyNumber=None,
             Value=headcount.FTE,
-            TimeStamp = time_stamp if time_stamp else start_date
+            TimeStamp = time_stamp if time_stamp else start_date,
+            Label=r.OUTPUT_LABEL_ACTUALS
         )
 
         populated_rows.append(row)

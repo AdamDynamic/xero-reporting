@@ -45,6 +45,7 @@ class MasterDataIncompleteError(AttributeError):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
 
+
 class BalanceSheetImbalanceError(AttributeError):
     '''
     Customer error class raised when a the Balance Sheet for a period doesn't net to nil
@@ -52,9 +53,18 @@ class BalanceSheetImbalanceError(AttributeError):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
 
+
 class CashFlowCalculationError(AttributeError):
     '''
     Customer error class raised when the indirect cashflow calculations fail
+    '''
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
+
+class BudgetDataExistsError(AttributeError):
+    '''
+    Customer error class raised Budget data already exists and the user attempts to overwrite it
     '''
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
