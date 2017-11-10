@@ -8,17 +8,21 @@ This folder contains the database SQL schema used by the financial reporting dat
 
 The tables included in the database are as follows:
 
-- `tbl_DATA_allocations`
-- `tbl_DATA_financialstatements`
-- `tbl_DATA_xeroextract`
+- `tbl_DATA_allocations_actuals`
+- `tbl_DATA_converted_actuals`
+- `tbl_DATA_extract_xero` 
+- `tbl_DATA_headcount_actuals`
+
+- `tbl_DATA_allocations_budget`
+- `tbl_DATA_extract_finmodel` 
 
 - `tbl_MASTER_allocationaccounts`
 - `tbl_MASTER_chartofaccounts`
 - `tbl_MASTER_companies`
 - `tbl_MASTER_costcentres`
-- `tbl_MASTER_headcount`
 - `tbl_MASTER_nodehierarchy`
 - `tbl_MASTER_periods`
 
-- `tbl_OUTPUT_consolidated_finstat`
+- `tbl_OUTPUT_consolidated_actuals`
+- `tbl_OUTPUT_consolidated_budget`
 

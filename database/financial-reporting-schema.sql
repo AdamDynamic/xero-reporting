@@ -3,8 +3,8 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Aug 18, 2017 at 09:15 AM
--- Server version: 5.7.19-0ubuntu0.16.04.1
+-- Generation Time: Nov 10, 2017 at 08:07 AM
+-- Server version: 5.7.20-0ubuntu0.16.04.1
 -- PHP Version: 7.0.22-0ubuntu0.16.04.1
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -23,10 +23,10 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_DATA_allocations`
+-- Table structure for table `tbl_DATA_allocations_actuals`
 --
 
-CREATE TABLE `tbl_DATA_allocations` (
+CREATE TABLE `tbl_DATA_allocations_actuals` (
   `ID` int(11) NOT NULL,
   `DateAllocationsRun` datetime NOT NULL COMMENT 'Timestamp of when the allocation process was run',
   `SendingCostCentre` text NOT NULL COMMENT 'Cost Centre the costs are allocated from',
@@ -42,10 +42,30 @@ CREATE TABLE `tbl_DATA_allocations` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_DATA_financialstatements`
+-- Table structure for table `tbl_DATA_allocations_budget`
 --
 
-CREATE TABLE `tbl_DATA_financialstatements` (
+CREATE TABLE `tbl_DATA_allocations_budget` (
+  `ID` int(11) NOT NULL,
+  `DateAllocationsRun` datetime NOT NULL COMMENT 'Timestamp of when the allocation process was run',
+  `SendingCostCentre` text NOT NULL COMMENT 'Cost Centre the costs are allocated from',
+  `ReceivingCostCentre` text NOT NULL COMMENT 'Cost Centre the costs are allocated to',
+  `SendingCompany` int(11) NOT NULL,
+  `ReceivingCompany` int(11) NOT NULL,
+  `Period` datetime NOT NULL,
+  `GLAccount` int(11) NOT NULL COMMENT 'Indirect cost account used for the allocation',
+  `CostHierarchy` int(11) NOT NULL COMMENT 'The hierarchy tier that the costs were allocated from',
+  `Value` decimal(10,3) NOT NULL,
+  `Label` text NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_DATA_converted_actuals`
+--
+
+CREATE TABLE `tbl_DATA_converted_actuals` (
   `ID` int(11) NOT NULL,
   `TimeStamp` datetime DEFAULT NULL COMMENT 'Datetime the data was imported',
   `CompanyCode` int(11) NOT NULL,
@@ -58,10 +78,28 @@ CREATE TABLE `tbl_DATA_financialstatements` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_DATA_xeroextract`
+-- Table structure for table `tbl_DATA_extract_finmodel`
 --
 
-CREATE TABLE `tbl_DATA_xeroextract` (
+CREATE TABLE `tbl_DATA_extract_finmodel` (
+  `ID` int(11) NOT NULL,
+  `TimeStamp` datetime NOT NULL COMMENT 'Datetime when the data was generated in the model',
+  `Period` date NOT NULL COMMENT 'Period of the Budget the data relates to',
+  `CompanyCode` text NOT NULL COMMENT 'Code of the company',
+  `CostCentreCode` text NOT NULL COMMENT 'Code of the cost centre',
+  `GLCode` int(11) NOT NULL COMMENT 'Code of the GL',
+  `Value` decimal(10,0) NOT NULL,
+  `Label` text NOT NULL COMMENT 'Identifier for the dataset',
+  `Comments` text NOT NULL COMMENT 'User comments for the file upload'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COMMENT='Budget and Forecast data extracted from the Financial Model';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_DATA_extract_xero`
+--
+
+CREATE TABLE `tbl_DATA_extract_xero` (
   `ID` int(11) NOT NULL COMMENT 'Auto-incremented row IDs',
   `DateExtracted` datetime NOT NULL COMMENT 'DateTime for when the extract was taken from Xero',
   `ReportName` text NOT NULL COMMENT 'The name of the report as defined in Xero',
@@ -71,6 +109,25 @@ CREATE TABLE `tbl_DATA_xeroextract` (
   `AccountName` text NOT NULL COMMENT 'The name of the account as defined in Xero',
   `Period` datetime NOT NULL COMMENT 'The accounting period the item is posted in',
   `Value` decimal(10,3) NOT NULL COMMENT 'Balance of the account at the reporting date'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_DATA_headcount_actuals`
+--
+
+CREATE TABLE `tbl_DATA_headcount_actuals` (
+  `EmployeeID` int(11) NOT NULL,
+  `FirstName` text NOT NULL,
+  `LastName` text NOT NULL,
+  `JobTitle` text NOT NULL,
+  `IsContractor` tinyint(1) NOT NULL COMMENT 'Flag for whether the headcount is a contractor or not',
+  `StartDate` datetime NOT NULL COMMENT 'Date the employee started with the company',
+  `EndDate` datetime DEFAULT NULL COMMENT 'Date the employee left the company',
+  `CostCentreCode` text NOT NULL COMMENT 'Clearmatics ID for the cost centre the employee works in',
+  `CompanyCode` int(11) NOT NULL COMMENT 'The code of the company the employee works for',
+  `FTE` decimal(10,0) NOT NULL COMMENT 'Full-time equivalent of the role'
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -142,23 +199,6 @@ CREATE TABLE `tbl_MASTER_costcentres` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_MASTER_headcount`
---
-
-CREATE TABLE `tbl_MASTER_headcount` (
-  `EmployeeID` int(11) NOT NULL,
-  `FirstName` text NOT NULL,
-  `LastName` text NOT NULL,
-  `JobTitle` text NOT NULL,
-  `StartDate` datetime NOT NULL COMMENT 'Date the employee started with the company',
-  `EndDate` datetime DEFAULT NULL COMMENT 'Date the employee left the company',
-  `CostCentreCode` text NOT NULL COMMENT 'Clearmatics ID for the cost centre the employee works in',
-  `CompanyCode` int(11) NOT NULL COMMENT 'The code of the company the employee works for'
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `tbl_MASTER_nodehierarchy`
 --
 
@@ -183,16 +223,17 @@ CREATE TABLE `tbl_MASTER_nodehierarchy` (
 CREATE TABLE `tbl_MASTER_periods` (
   `ID` int(11) NOT NULL,
   `Period` date NOT NULL,
-  `IsLocked` tinyint(1) NOT NULL COMMENT 'Whether the date can be written to or not'
+  `IsLocked` tinyint(1) NOT NULL COMMENT 'Whether the date can be written to or not',
+  `IsPublished` tinyint(1) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `tbl_OUTPUT_consolidated_finstat`
+-- Table structure for table `tbl_OUTPUT_consolidated_actuals`
 --
 
-CREATE TABLE `tbl_OUTPUT_consolidated_finstat` (
+CREATE TABLE `tbl_OUTPUT_consolidated_actuals` (
   `ID` int(11) NOT NULL,
   `Period` datetime NOT NULL,
   `CompanyCode` int(11) NOT NULL,
@@ -213,8 +254,41 @@ CREATE TABLE `tbl_OUTPUT_consolidated_finstat` (
   `L3Code` text NOT NULL,
   `L3Name` text NOT NULL,
   `CostHierarchyNumber` int(11) DEFAULT NULL,
-  `Value` decimal(10,3) NOT NULL,
-  `TimeStamp` datetime NOT NULL
+  `Value` decimal(15,3) NOT NULL,
+  `TimeStamp` datetime NOT NULL,
+  `Label` text NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_OUTPUT_consolidated_budget`
+--
+
+CREATE TABLE `tbl_OUTPUT_consolidated_budget` (
+  `ID` int(11) NOT NULL,
+  `Period` datetime NOT NULL,
+  `CompanyCode` int(11) NOT NULL,
+  `CompanyName` text NOT NULL,
+  `PartnerCompanyCode` int(11) DEFAULT NULL,
+  `PartnerCompanyName` text,
+  `CostCentreCode` text,
+  `CostCentreName` text,
+  `PartnerCostCentreCode` text,
+  `PartnerCostCentreName` text,
+  `FinancialStatement` text NOT NULL,
+  `GLAccountCode` int(11) NOT NULL,
+  `GLAccountName` text NOT NULL,
+  `L1Code` text NOT NULL,
+  `L1Name` text NOT NULL,
+  `L2Code` text NOT NULL,
+  `L2Name` text NOT NULL,
+  `L3Code` text NOT NULL,
+  `L3Name` text NOT NULL,
+  `CostHierarchyNumber` int(11) DEFAULT NULL,
+  `Value` decimal(15,3) NOT NULL,
+  `TimeStamp` datetime NOT NULL,
+  `Label` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
@@ -222,22 +296,40 @@ CREATE TABLE `tbl_OUTPUT_consolidated_finstat` (
 --
 
 --
--- Indexes for table `tbl_DATA_allocations`
+-- Indexes for table `tbl_DATA_allocations_actuals`
 --
-ALTER TABLE `tbl_DATA_allocations`
+ALTER TABLE `tbl_DATA_allocations_actuals`
   ADD PRIMARY KEY (`ID`);
 
 --
--- Indexes for table `tbl_DATA_financialstatements`
+-- Indexes for table `tbl_DATA_allocations_budget`
 --
-ALTER TABLE `tbl_DATA_financialstatements`
+ALTER TABLE `tbl_DATA_allocations_budget`
   ADD PRIMARY KEY (`ID`);
 
 --
--- Indexes for table `tbl_DATA_xeroextract`
+-- Indexes for table `tbl_DATA_converted_actuals`
 --
-ALTER TABLE `tbl_DATA_xeroextract`
+ALTER TABLE `tbl_DATA_converted_actuals`
   ADD PRIMARY KEY (`ID`);
+
+--
+-- Indexes for table `tbl_DATA_extract_finmodel`
+--
+ALTER TABLE `tbl_DATA_extract_finmodel`
+  ADD PRIMARY KEY (`ID`);
+
+--
+-- Indexes for table `tbl_DATA_extract_xero`
+--
+ALTER TABLE `tbl_DATA_extract_xero`
+  ADD PRIMARY KEY (`ID`);
+
+--
+-- Indexes for table `tbl_DATA_headcount_actuals`
+--
+ALTER TABLE `tbl_DATA_headcount_actuals`
+  ADD PRIMARY KEY (`EmployeeID`);
 
 --
 -- Indexes for table `tbl_MASTER_allocationaccounts`
@@ -264,12 +356,6 @@ ALTER TABLE `tbl_MASTER_costcentres`
   ADD PRIMARY KEY (`ID`);
 
 --
--- Indexes for table `tbl_MASTER_headcount`
---
-ALTER TABLE `tbl_MASTER_headcount`
-  ADD PRIMARY KEY (`EmployeeID`);
-
---
 -- Indexes for table `tbl_MASTER_nodehierarchy`
 --
 ALTER TABLE `tbl_MASTER_nodehierarchy`
@@ -282,9 +368,15 @@ ALTER TABLE `tbl_MASTER_periods`
   ADD PRIMARY KEY (`ID`);
 
 --
--- Indexes for table `tbl_OUTPUT_consolidated_finstat`
+-- Indexes for table `tbl_OUTPUT_consolidated_actuals`
 --
-ALTER TABLE `tbl_OUTPUT_consolidated_finstat`
+ALTER TABLE `tbl_OUTPUT_consolidated_actuals`
+  ADD PRIMARY KEY (`ID`);
+
+--
+-- Indexes for table `tbl_OUTPUT_consolidated_budget`
+--
+ALTER TABLE `tbl_OUTPUT_consolidated_budget`
   ADD PRIMARY KEY (`ID`);
 
 --
@@ -292,19 +384,29 @@ ALTER TABLE `tbl_OUTPUT_consolidated_finstat`
 --
 
 --
--- AUTO_INCREMENT for table `tbl_DATA_allocations`
+-- AUTO_INCREMENT for table `tbl_DATA_allocations_actuals`
 --
-ALTER TABLE `tbl_DATA_allocations`
+ALTER TABLE `tbl_DATA_allocations_actuals`
   MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT;
 --
--- AUTO_INCREMENT for table `tbl_DATA_financialstatements`
+-- AUTO_INCREMENT for table `tbl_DATA_allocations_budget`
 --
-ALTER TABLE `tbl_DATA_financialstatements`
+ALTER TABLE `tbl_DATA_allocations_budget`
   MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT;
 --
--- AUTO_INCREMENT for table `tbl_DATA_xeroextract`
+-- AUTO_INCREMENT for table `tbl_DATA_converted_actuals`
 --
-ALTER TABLE `tbl_DATA_xeroextract`
+ALTER TABLE `tbl_DATA_converted_actuals`
+  MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT;
+--
+-- AUTO_INCREMENT for table `tbl_DATA_extract_finmodel`
+--
+ALTER TABLE `tbl_DATA_extract_finmodel`
+  MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT;
+--
+-- AUTO_INCREMENT for table `tbl_DATA_extract_xero`
+--
+ALTER TABLE `tbl_DATA_extract_xero`
   MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Auto-incremented row IDs';
 --
 -- AUTO_INCREMENT for table `tbl_MASTER_allocationaccounts`
@@ -337,9 +439,14 @@ ALTER TABLE `tbl_MASTER_nodehierarchy`
 ALTER TABLE `tbl_MASTER_periods`
   MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT;
 --
--- AUTO_INCREMENT for table `tbl_OUTPUT_consolidated_finstat`
+-- AUTO_INCREMENT for table `tbl_OUTPUT_consolidated_actuals`
 --
-ALTER TABLE `tbl_OUTPUT_consolidated_finstat`
+ALTER TABLE `tbl_OUTPUT_consolidated_actuals`
+  MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT;
+--
+-- AUTO_INCREMENT for table `tbl_OUTPUT_consolidated_budget`
+--
+ALTER TABLE `tbl_OUTPUT_consolidated_budget`
   MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
