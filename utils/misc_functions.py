@@ -16,8 +16,10 @@ from tkFileDialog import askopenfilename, askdirectory
 from customobjects import error_objects
 from customobjects.database_objects import \
     TablePeriods
+from utils.console_output import util_output
 from utils.data_integrity import check_period_exists, check_period_is_locked
 from utils.db_connect import db_sessionmaker
+import references as r
 
 
 def convert_dir_path_to_standard_format(folder_path):
@@ -158,7 +160,48 @@ def set_period_lock_status(year, month, status):
     check_period_exists(year=year, month=month)
     session=db_sessionmaker()
     # If it exists, set the lock status
-    set_lock = session.query(TablePeriods).filter(TablePeriods.Period == period_to_update).update({"IsLocked":status})
+    set_lock = session.query(TablePeriods).filter(TablePeriods.Period == period_to_update)\
+        .update({r.COL_PERIOD_ISLOCKED:status})
     session.commit()
     session.close()
 
+def set_period_published_status(year, month, status):
+    ''' Sets whether a period is locked or unlocked
+
+    :param year:
+    :param month:
+    :param status:
+    :return:
+    '''
+
+    assert status in [True, False], "User input is invalid - only TRUE or FALSE are permitted inputs"
+
+    period_to_update = datetime.datetime(year=year, month=month, day=1)
+    check_period_exists(year=year, month=month)
+    session=db_sessionmaker()
+    # If it exists, set the lock status
+    set_lock = session.query(TablePeriods).filter(TablePeriods.Period == period_to_update)\
+        .update({r.COL_PERIOD_ISPUBLISHED:status})
+    session.commit()
+    session.close()
+
+def user_confirm_action_on_period(action,dataset):
+    ''' Prompts the user to confirm an action on a dataset (e.g. locking, publishing)
+
+    :param action: Text description of the action (for use in console output)
+    :param dataset: Text description of the dataset the action is performed on
+    :return: True/False on whether the action should be performed
+    '''
+
+    check_status = False
+    # Perform additional check only if the user wants to publish a period (i.e. ok to unpublish without checking)
+    check_input = raw_input("Please confirm you want to {} {} (Y/N):".format(action, dataset))
+    if check_input in ['y', 'Y']:
+        check_status = True
+    elif check_input in ['n', 'N']:
+        pass
+    else:
+        # Inform the user that the input is incorrect and then abort the publishing process
+        util_output("Input '{}' not recognised. Valid inputs are 'Y' or 'N'.".format(check_input))
+
+    return check_status

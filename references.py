@@ -97,6 +97,8 @@ COL_CC_CODE = "CostCentreCode"
 
 TBL_MASTER_PERIODS = "tbl_MASTER_periods"
 COL_PERIOD_PERIOD = "Period"
+COL_PERIOD_ISLOCKED = "IsLocked"
+COL_PERIOD_ISPUBLISHED = "IsPublished"
 
 TBL_MASTER_NODEHIERARCHY = "tbl_MASTER_nodehierarchy"
 COL_NODE_L3CODE = "L3Code"

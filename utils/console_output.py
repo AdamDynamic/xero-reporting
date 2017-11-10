@@ -156,6 +156,8 @@ def get_actuals_status_table():
     '''
 
     # ToDo: Add column with time-stamp of last operation
+    # ToDo: Include "recalculate" requirement for instance where the TimeStampCheck shows an error
+    # ToDo: Add col with NPAT total for the period (sense-check)
 
     session = db_sessionmaker()
 
@@ -204,8 +206,8 @@ def get_actuals_status_table():
     pnl_dates = [row.Period.date() for row in pnl_qry if row.count != 0]
     alloc_dates = [row.Period.date() for row in alloc_qry if row.count != 0]
     consol_dates = [row.Period.date() for row in consol_qry if row.count != 0]
-    # ToDo: Include 'IsPublished' flag
-    table_headers = ["Period", "IsLocked", "1) ActualsData", "2) Converted",
+
+    table_headers = ["Period", "IsLocked", "IsPublished", "1) ActualsData", "2) Converted",
                      "3) Allocations", "4) Consol", "TimestampCheck"]
 
     # table_rows are lists of values that correspond to the headers in the list above
@@ -214,7 +216,6 @@ def get_actuals_status_table():
     for qry_row in period_qry:
 
         # Get the timestamps of each process to check the order has been run correctly
-        # ToDo: Refactor this so that the results aren't returned as lists
         # Results are returned as lists to capture the instance where no results are returned (returns [])
         xero_timestamp = list(set([row.timestamp for row in xero_qry if row.Period.date()==qry_row.Period]))
         pnl_timestamp = list(set([row.timestamp for row in pnl_qry if row.Period.date()==qry_row.Period]))
@@ -227,9 +228,9 @@ def get_actuals_status_table():
                                                         alloc_date=alloc_timestamp,
                                                         consol_date=consol_timestamp)
 
-        # ToDo: Include "recalculate" requirement for instance where the TimeStampCheck shows an error
         table_row = [qry_row.Period,
                       ('True' if qry_row.IsLocked else 'False'),
+                      ('True' if qry_row.IsPublished else 'False'),
                       ('Imported' if qry_row.Period in xero_dates else 'Not Imported'),
                       ('Imported' if qry_row.Period in pnl_dates else 'Not Imported'),
                       ('Calculated' if qry_row.Period in alloc_dates else 'Not Calculated'),
@@ -237,8 +238,6 @@ def get_actuals_status_table():
                       ('Pass' if step_number_complete==5 else 'Run From Step {}'.format(step_number_complete))
                       ]
         table_rows.append(table_row)
-
-        # ToDo: Add col with NPAT total for the period (sense-check)
 
     # Output the table to the console
     return tabulate(tabular_data=table_rows, headers=table_headers, numalign="right") + "\n"
@@ -249,7 +248,7 @@ def display_status_table():
     :return:
     '''
 
-    print "##### ACTUALS DATA #####"
+    print "\n##### ACTUALS DATA #####"
     actuals_table = get_actuals_status_table()
     print "\n" + actuals_table
 

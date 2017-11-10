@@ -413,6 +413,7 @@ class TablePeriods(Base):
     ID = Column(Integer, primary_key=True)
     Period = Column(DateTime)
     IsLocked = Column(Integer)
+    IsPublished = Column(Integer)
 
 
 class TableXeroExtract(Base):

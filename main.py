@@ -5,17 +5,17 @@
 Command Line Interface for the management reporting database and associated functions
 '''
 
+import click
 import requests
 
-import click
-
+import utils.data_integrity
+import utils.misc_functions
 from budget import budget_import
 from customobjects import error_objects, database_objects
 from management_accounting.allocations import allocate_actuals_data, allocate_budget_data
 from management_accounting.data_import import create_internal_financial_statements, create_consolidated_financial_statements
 from utils.console_output import util_output, display_status_table
-import utils.misc_functions
-import utils.data_integrity
+from utils.misc_functions import user_confirm_action_on_period
 from utils.xero_connect import pull_xero_data_to_database
 
 @click.group()
@@ -29,9 +29,9 @@ def fin_reporting():
 def actuals_lock_period(year, month, locked):
     ''' Locks/unlocks a given period in the reporting database to prevent data being overwritten
 
-    :param year:
-    :param month:
-    :param locked:
+    :param year: Year of the actuals dataset to lock
+    :param month: Month of the actuals dataset to lock
+    :param locked: True/False whether the period should be locked (True) or unlocked (False)
     :return:
     '''
 
@@ -48,20 +48,50 @@ def actuals_lock_period(year, month, locked):
         if not locked in [True, False]:
             util_output("ERROR: User input '{}' not recognised: options are 'True' or 'False'".format(locked))
         else:
-            check_status = False
-            # Perform additional check only if the user wants to unlock a period (i.e. ok to lock without checking)
-            if locked == False:
-                check_input = raw_input("Please confirm you want to unlock period {}.{} (Y/N):".format(year, month))
-                if check_input in ['y','Y']:
-                    check_status=True
-            else:
-                check_status=True
+            check_status = user_confirm_action_on_period(action=('LOCK' if locked else 'UNLOCK'),
+                                                         dataset=str(year) + "." + str(month))
 
             if check_status:
                 utils.misc_functions.set_period_lock_status(year=year, month=month, status=locked)
                 util_output("Reporting period {}.{} is {}".format(year, month, ("LOCKED" if locked else "UNLOCKED")))
             else:
                 util_output("Locking process aborted for period {}.{}".format(year, month))
+
+
+@fin_reporting.command(help="Published/unpublishes a given period in the database")
+@click.option('--year', type=int, help="The year of the period in the database to publish")
+@click.option('--month', type=int, help="The month of the period in the database to publish")
+@click.option('--publish', type=bool, help="True/False of whether to publish the period")
+def actuals_publish_period(year, month, publish):
+    ''' Publishes/unpublishes (makes available to external reports) a given period in the reporting database
+    to prevent data being exposed before it is considered ready by the user
+
+    :param year: Year of the actuals dataset to publish
+    :param month: Month of the actuals dataset to publish
+    :param publish: True/False whether the period should be published (True) or unpublished (False)
+    :return:
+    '''
+
+    try:
+        utils.data_integrity.check_period_exists(year=year, month=month)
+
+    except error_objects.PeriodNotFoundError, e:
+        util_output("ERROR: {}".format(e.message))
+        util_output("ERROR: Setting of period publish status aborted")
+
+    else:
+        # Execute the publishing/unpublishing process only if the period is valid and exists in the database
+
+        if not publish in [True, False]:
+            util_output("ERROR: User input '{}' not recognised: options are 'True' or 'False'".format(publish))
+        else:
+            check_status = user_confirm_action_on_period(action=('PUBLISH' if publish else 'UNPUBLISH'),
+                                                         dataset=str(year)+"."+str(month))
+            if check_status:
+                utils.misc_functions.set_period_published_status(year=year, month=month, status=publish)
+                util_output("Reporting period {}.{} is {}".format(year, month, ("PUBLISHED" if publish else "UNPUBLISHED")))
+            else:
+                util_output("Publishing process aborted for period {}.{}".format(year, month))
 
 
 @fin_reporting.command(help="Retrieves financial data from Xero")
