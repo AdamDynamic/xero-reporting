@@ -9,17 +9,16 @@ import csv
 import datetime
 import errno
 import os
-
 from Tkinter import Tk
 from tkFileDialog import askopenfilename, askdirectory
 
+import references as r
 from customobjects import error_objects
 from customobjects.database_objects import \
     TablePeriods
 from utils.console_output import util_output
 from utils.data_integrity import check_period_exists, check_period_is_locked
 from utils.db_connect import db_sessionmaker
-import references as r
 
 
 def convert_dir_path_to_standard_format(folder_path):

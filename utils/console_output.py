@@ -6,11 +6,15 @@ Contains helper and utility functions used to output messages to the command win
 '''
 
 import datetime
+from tabulate import tabulate
 
 import click
-from tabulate import tabulate
 from sqlalchemy import func, asc
 
+import customobjects.error_objects as error_objects
+import references as r
+import utils.data_integrity
+#import utils.misc_functions
 from customobjects.database_objects import \
     TablePeriods, \
     TableXeroExtract, \
@@ -20,12 +24,8 @@ from customobjects.database_objects import \
     TableFinModelExtract, \
     TableBudgetAllocationsData, \
     TableConsolidatedBudget
-import customobjects.error_objects as error_objects
 from utils.data_integrity import get_all_bs_nodes_unmapped_for_cashflow
-import utils.data_integrity
 from utils.db_connect import db_sessionmaker
-import utils.misc_functions
-import references as r
 
 def util_output(message):
     ''' Outputs to the console screen and logs as an INFO message via the logging module.
