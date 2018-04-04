@@ -6,8 +6,10 @@ Contains the functions used to import budget and forecast data as produced by th
 '''
 import datetime
 
+from dateutil import parser
 from sqlalchemy.orm import aliased
 
+import utils.console_output
 from customobjects import error_objects
 from customobjects.database_objects import \
     TableFinModelExtract, \
@@ -47,8 +49,8 @@ def import_budget_data_to_database(filepath, overwrite_data=False):
     session = db_sessionmaker()
     for row in file_as_lists:
         new_row = TableFinModelExtract(
-                                        TimeStamp = row[1],
-                                        Period = row[2],
+                                        TimeStamp = budget.budget_import.convert_string_to_datetime(row[1]),
+                                        Period = budget.budget_import.convert_string_to_datetime(row[2]),
                                         CompanyCode = row[3],
                                         CostCentreCode = row[4],
                                         GLCode = row[5],
@@ -75,6 +77,9 @@ def check_label_exists_in_database(label):
         return True
     else:
         return False
+
+def convert_string_to_datetime(input):
+    return parser.parse(input)
 
 def delete_existing_budget_data_by_label(table, label):
     ''' Deletes data in the tbl_DATA_finmodelextract by tag
@@ -206,3 +211,5 @@ def create_consolidated_budget_data(label):
         session. add(row)
     session.commit()
     session.close()
+
+
