@@ -79,7 +79,7 @@ def check_label_exists_in_database(label):
         return False
 
 def convert_string_to_datetime(input):
-    return parser.parse(input)
+    return parser.parse(input, dayfirst=True)
 
 def delete_existing_budget_data_by_label(table, label):
     ''' Deletes data in the tbl_DATA_finmodelextract by tag
@@ -211,5 +211,3 @@ def create_consolidated_budget_data(label):
         session. add(row)
     session.commit()
     session.close()
-
-
