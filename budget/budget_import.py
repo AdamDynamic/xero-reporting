@@ -49,8 +49,8 @@ def import_budget_data_to_database(filepath, overwrite_data=False):
     session = db_sessionmaker()
     for row in file_as_lists:
         new_row = TableFinModelExtract(
-                                        TimeStamp = budget.budget_import.convert_string_to_datetime(row[1]),
-                                        Period = budget.budget_import.convert_string_to_datetime(row[2]),
+                                        TimeStamp = convert_string_to_datetime(row[1]),
+                                        Period = convert_string_to_datetime(row[2]),
                                         CompanyCode = row[3],
                                         CostCentreCode = row[4],
                                         GLCode = row[5],
