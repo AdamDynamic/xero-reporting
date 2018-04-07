@@ -117,6 +117,7 @@ The user of the model must identify the Xero ID of the attribute (looks somethin
 The following items are still outstanding:
 
 1. Way of efficiently updating the headcount table to account for joiners/leavers.
+2. The `status` table fails to generate if new budget data is only partially imported (need to complete full import, run allocations, etc before the table will generate correctly).
 2. Create functions for updating the master data via the command line.
 3. Unit testing for `cashflow_calcs.py` module.
 4. Include descriptions of the tables in the README file.
