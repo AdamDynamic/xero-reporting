@@ -27,6 +27,7 @@ def create_headcount_rows_actuals(year, month, time_stamp=None):
     :return: TableConsolidatedFinStatements row objects
     '''
 
+    # ToDo: Takes the headcount on the first day of the reporting month - should be as of the last day
     # Only need headcount for employees in the business during the month
     start_date = datetime.datetime(year=year, month=month, day=1)
     end_date = datetime.datetime(year=year, month=month, day=1) + relativedelta(months=1) + relativedelta(days=-1)
@@ -34,7 +35,7 @@ def create_headcount_rows_actuals(year, month, time_stamp=None):
     # Get all headcount at the end of the period that have started but haven't left
     session = db_sessionmaker()
     headcount_qry = session.query(TableHeadcount, TableCompanies, TableCostCentres)\
-        .filter(TableHeadcount.StartDate<=start_date)\
+        .filter(TableHeadcount.StartDate<=end_date)\
         .filter(or_(TableHeadcount.EndDate>end_date,TableHeadcount.EndDate==None))\
         .filter(TableHeadcount.CompanyCode==TableCompanies.CompanyCode)\
         .filter(TableHeadcount.CostCentreCode==TableCostCentres.CostCentreCode)\
