@@ -46,7 +46,8 @@ CM_BS_CASH = 'L2A-CASH'
 
 CM_HC_L1 = "L1-Headcount"
 CM_HC_L2 = "L2-Headcount"
-CM_HC_GL = 999999 # ToDo: Refactor to capture GLs for Perm and Contract headcount
+CM_HC_GL_PERMANENT = 999998
+CM_HC_GL_CONTRACT = 999999 # ToDo: Refactor to capture GLs for Perm and Contract headcount
 
 OUTPUT_LABEL_ACTUALS = "actuals"
 

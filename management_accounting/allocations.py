@@ -170,6 +170,7 @@ def get_all_budget_periods(label):
     # Remove all duplicates from the list of periods
     output = list(set([(d[0].year, d[0].month) for d in all_dates]))
     output.sort()
+
     return output
 
 def get_all_budget_employees_from_database(year, month, label):
@@ -188,8 +189,8 @@ def get_all_budget_employees_from_database(year, month, label):
     # ToDo: Refactor to capture GLs for perm and contract
     qry_headcount = session.query(TableFinModelExtract)\
         .filter(TableFinModelExtract.Label == label)\
-        .filter(TableFinModelExtract.Period==period_to_retrieve)\
-        .filter(TableFinModelExtract.GLCode==r.CM_HC_GL)\
+        .filter(TableFinModelExtract.Period == period_to_retrieve)\
+        .filter(or_(TableFinModelExtract.GLCode == r.CM_HC_GL_CONTRACT,TableFinModelExtract.GLCode == r.CM_HC_GL_PERMANENT))\
         .all()
     session.close()
 
@@ -293,6 +294,8 @@ def get_allocation_percentages_for_hierarchy_level(costcentres, hierarchy_level_
 
     for cc in receiving_costcentres:
         total_receiving_fte += cc.fte()
+
+    assert total_receiving_fte !=0
 
     for sender_cc in sender_costcentres:
         receiving_dict = {}
