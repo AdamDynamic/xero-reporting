@@ -34,13 +34,33 @@ def get_xero_instance():
 
     return xero
 
+def get_tracking_categories():
+    ''' Returns all tracking categories currently set up in Xero
+
+    :return:
+    '''
+
+    xero = get_xero_instance()
+    return xero.trackingcategories.all()
+
+def get_cost_centre_id_dictionary():
+    ''' Creates a dictionary of cost centre names and IDs as mapped in Xero
+
+    :return:
+    '''
+
+    categories = get_tracking_categories()
+    cost_centres = [d for d in categories if d['Name']==r.XERO_DATA_COSTCENTRES][0]
+    options = cost_centres['Options']
+    output_dict = {a['Name']:a['TrackingOptionID'] for a in options}
+    return output_dict
+
 def print_tracking_categories():
     ''' Utility function to return all tracking categories currently set up in Xero
 
     :return:
     '''
-    xero = get_xero_instance()
-    pprint.pprint(xero.trackingcategories.all())
+    pprint.pprint(get_tracking_categories())
 
 def get_to_from_date_range(year, month):
     ''' Calculates the to and from dates for each reporting period, taking into account leap years, months of different lengths, etc
@@ -128,7 +148,7 @@ def get_list_of_cost_centres(xero_data):
                     list_of_cost_centres.append(cost_centre)
     return list_of_cost_centres
 
-def parse_xero_pnl_body_data(xero_data, list_of_cost_centres, year, month):
+def parse_xero_pnl_body_data(xero_data, list_of_cost_centres, cost_centre_dict, year, month):
     ''' Parses the Profit & Loss (split by Cost Centre) report and imports into the database
 
     :param xero_data:
@@ -154,14 +174,26 @@ def parse_xero_pnl_body_data(xero_data, list_of_cost_centres, year, month):
                 else:
                     # Exclude the first cell (the account name) and the last cell (the total)
                     for i in range(1,len(list_of_cost_centres)-1):
-                        cost_centre = list_of_cost_centres[i]
+                        cost_centre_name = list_of_cost_centres[i]
+
+                        # The "Unassigned" cost centre is not included in the dictionary so must be handled separtely.
+                        cost_centre_code = None
+                        try:
+                           cost_centre_code = cost_centre_dict[cost_centre_name]
+                        except KeyError, e:
+                            if cost_centre_name == r.XERO_DATA_COSTCENTRES_UNASSIGNED:
+                                pass
+                            else:
+                                raise e
+
                         value = section['Cells'][i]['Value']
 
                         xero_ledger_entry = TableXeroExtract(
                                                             DateExtracted = timestamp,
                                                             ReportName = report_name,
                                                             CompanyName = company_name,
-                                                            CostCentreName = cost_centre,
+                                                            CostCentreCode = cost_centre_code,
+                                                            CostCentreName = cost_centre_name,
                                                             AccountCode = account_code,
                                                             AccountName = account_name,
                                                             Period = period,
@@ -230,15 +262,25 @@ def pull_xero_data_to_database(year, month):
 
     # Pull both the Income Statement data and Balance Sheet data from the API
     pnl_xero_data = get_xero_profit_and_loss_data(year=year, month=month)
-    list_of_costcentres = get_list_of_cost_centres(xero_data=pnl_xero_data) # Used for the Income Statement only
     bs_xero_data = get_xero_balancesheet_data(year=year, month=month)
+
+    # Retrieve the Cost Centres that the data is mapped against
+    list_of_costcentres = get_list_of_cost_centres(xero_data=pnl_xero_data) # Used for the Income Statement only
+    cost_centre_id_mapping = get_cost_centre_id_dictionary()
 
     try:
         session = db_sessionmaker()
-        pnl_data_rows = parse_xero_pnl_body_data(xero_data=pnl_xero_data, list_of_cost_centres=list_of_costcentres,
-                                                 year=year, month=month)
+        #pnl_data_rows = parse_xero_pnl_body_data(xero_data=pnl_xero_data, list_of_cost_centres=list_of_costcentres,
+        #                                         year=year, month=month)
+        pnl_data_rows = parse_xero_pnl_body_data(xero_data=pnl_xero_data,
+                                                 list_of_cost_centres=list_of_costcentres,
+                                                 cost_centre_dict=cost_centre_id_mapping,
+                                                 year=year,
+                                                 month=month)
 
-        bs_data_rows = parse_xero_balancesheet_body_data(xero_data=bs_xero_data, year=year, month=month)
+        bs_data_rows = parse_xero_balancesheet_body_data(xero_data=bs_xero_data,
+                                                         year=year,
+                                                         month=month)
 
         # Data should exist for all periods in Xero
         if not pnl_data_rows or not bs_data_rows:

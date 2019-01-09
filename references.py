@@ -30,6 +30,9 @@ HEADCOUNT_NAME_PERMANENT = "headcount-permanent"
 XERO_DATA_BALANCESHEET = "BalanceSheet"
 XERO_DATA_INCOMESTATEMENT = "ProfitAndLoss"
 
+XERO_DATA_COSTCENTRES = "CostCentre"
+XERO_DATA_COSTCENTRES_UNASSIGNED = "Unassigned"
+
 # Clearmatics data mappings
 
 CM_DATA_BALANCESHEET = "BalanceSheet"

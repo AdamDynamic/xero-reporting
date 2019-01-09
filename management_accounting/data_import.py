@@ -44,9 +44,9 @@ def create_internal_profit_and_loss(year, month):
     session = db_sessionmaker()
     period_to_extract = datetime.datetime(year=year, month=month, day=1)
 
-    query = session.query(TableXeroExtract,  TableCompanies, TableCostCentres, TableChartOfAccounts)\
+    query = session.query(TableXeroExtract, TableCompanies, TableCostCentres, TableChartOfAccounts)\
         .filter(TableXeroExtract.CompanyName==TableCompanies.XeroName)\
-        .filter(TableXeroExtract.CostCentreName==TableCostCentres.XeroName)\
+        .filter(TableXeroExtract.CostCentreCode==TableCostCentres.XeroCode)\
         .filter(TableXeroExtract.AccountCode==TableChartOfAccounts.XeroCode)\
         .filter(TableXeroExtract.Period==period_to_extract)\
         .all()

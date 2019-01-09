@@ -427,6 +427,7 @@ class TableXeroExtract(Base):
     DateExtracted = Column(DateTime)
     ReportName = Column(String)
     CompanyName = Column(String)
+    CostCentreCode = Column(String, nullable=True)
     CostCentreName = Column(String, nullable=True)
     AccountCode = Column(String)
     AccountName = Column(String)
