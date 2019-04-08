@@ -132,12 +132,23 @@ def get_budget_status_table():
 
     # 3) Create a table row for each label imported
     for label in labels_qry:
+        time_stamp_check=0
+        time_allocated = [alloc[1] for alloc in alloc_qry if alloc[0] == label[0]]
+        time_consol = [consol[1] for consol in consol_qry if consol[0] == label[0]]
 
-        time_allocated = [alloc[1] for alloc in alloc_qry if alloc[0]==label[0]]
-        time_consol = [consol[1] for consol in consol_qry if consol[0]==label[0]]
-        ordered_timestamps = [time_allocated[0], time_consol[0]]
-        time_stamp_check = first_datetime_not_ascending(list_of_timestamps=ordered_timestamps)
+        # Determine the whether the allocations and consolidation have been performed in the correct order
+        if time_allocated:
+            if time_consol:
+                if time_allocated<=time_consol:
+                    time_stamp_check=2
+                else:
+                    time_stamp_check=1
+            else:
+                time_stamp_check=1
+        else:
+            time_stamp_check=0
 
+        # Create the table row
         table_row = [label[0],
                      "N/A",
                      ('Calculated' if label[0] in labels_allocated else 'Not Calculated'),
@@ -248,6 +259,8 @@ def display_status_table():
     :return:
     '''
 
+    # ToDo: Add check that all cost centres are mapped correctly
+
     print "\n##### ACTUALS DATA #####"
     actuals_table = get_actuals_status_table()
     print "\n" + actuals_table
@@ -255,9 +268,10 @@ def display_status_table():
     # Check whether any accounts aren't mapped to the master coa account
     unmapped_accounts = list(set(utils.data_integrity.get_unmapped_xero_account_codes()))
     if unmapped_accounts:
-        print "The following Xero accounts are unmapped in the chart of accounts:"
+        print "##### UNMAPPED ACCOUNTS #####\n\nThe following Xero accounts are unmapped in the chart of accounts:\n"
         for row in unmapped_accounts:
             print " " + str(row)
+        print "\n"
 
     unmapped_cashflow_nodes = get_all_bs_nodes_unmapped_for_cashflow()
     if unmapped_cashflow_nodes:

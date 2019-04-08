@@ -175,3 +175,35 @@ class Test_Allocations(unittest.TestCase):
 
         # ToDo: Check that cpty_costcentres aren't allocating costs to themselves
 
+    def test_budget_date_check_returns_correct_value(self):
+        ''' Checks that the date check works as expected
+
+        :return:
+        '''
+
+        max_year=2020
+        max_month=3
+
+        test_year=2020
+        test_month_1=1
+        test_month_2=2
+        test_month_3=3
+
+        test_date_1 = allocations.allocation_date_check(test_year=test_year,
+                                                        test_month=test_month_1,
+                                                        max_year=max_year,
+                                                        max_month=max_month)
+        self.assertEqual(test_date_1,True)
+
+        test_date_2 = allocations.allocation_date_check(test_year=test_year,
+                                                        test_month=test_month_2,
+                                                        max_year=max_year,
+                                                        max_month=max_month)
+        self.assertEqual(test_date_2,True)
+
+        test_date_3 = allocations.allocation_date_check(test_year=test_year,
+                                                        test_month=test_month_3,
+                                                        max_year=max_year,
+                                                        max_month=max_month)
+        self.assertEqual(test_date_3,True)
+

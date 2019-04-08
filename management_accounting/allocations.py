@@ -559,13 +559,26 @@ def allocate_actuals_data(year, month):
     utils.misc_functions.delete_table_data_for_period(table=TableAllocationsData, year=year, month=month)
     upload_allocated_costs_actuals(costcentres=processed_costcentres)
 
+def allocation_date_check(test_year, test_month, max_year, max_month):
+    '''
+
+    :param test_year:
+    :param test_month:
+    :param max_year:
+    :param max_month:
+    :return:
+    '''
+
+    date_limit = datetime.datetime(year=max_year, month=max_month,day=1)
+    current_date = datetime.datetime(year=test_year, month=test_month, day=1)
+    return current_date<=date_limit
+
 def allocate_budget_data(label, max_year=9999, max_month=13):
     ''' Creates cost allocation data for budget data for a certain budget dataset
 
     :param label: The tag given to the budget dataset
     :return:
     '''
-
     utils.data_integrity.master_data_integrity_check_budget()
 
     # Get a list of all periods in the Budget data in the format (year, month)
@@ -575,13 +588,12 @@ def allocate_budget_data(label, max_year=9999, max_month=13):
     for year, month in all_periods:
         # To prevent large volumes of unnecessary data being generated, the period over which allocations
         # are run can be limited by the user
-        if year<=max_year and month<=max_month:
+        if allocation_date_check(max_year=max_year,max_month=max_month,test_year=year, test_month=month):
             unprocessed_costcentres = get_populated_costcentres_budget(year=year, month=month, label=label)
             processed_costcentres = allocate_indirect_cost_for_period(unprocessed_costcentres=unprocessed_costcentres)
             all_processed_costcentres += processed_costcentres
         else:
             break
-
     # Delete previously allocated data (for the relevant period only)
     session = db_sessionmaker()
     session.query(TableBudgetAllocationsData) \
