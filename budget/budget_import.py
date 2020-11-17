@@ -78,8 +78,35 @@ def check_label_exists_in_database(label):
     else:
         return False
 
-def convert_string_to_datetime(input):
-    return parser.parse(input, dayfirst=True)
+def convert_string_to_datetime(input_date):
+    ''' Converts a date represented by a string into a datetime.datetime object
+
+    :param input_date: Date represented by a string
+    :return: datetime.datetime object
+    '''
+
+    day_first=True
+
+    # Check whether the date follows a yyyy-mm-dd or dd/mm/yyyy format
+    # ToDo: This is a workaround - need a better solution
+
+    test_input = input_date[:]
+    if " " in test_input:
+        test_input = test_input.split(" ")[0]
+
+    if "-" in test_input:
+        date_list = test_input.split("-")
+        # Crude check whether the year is first or last
+        if (int(date_list[0]) > 12) and (int(date_list[2]) < 2000):
+            day_first = False
+    elif "/" in test_input:
+        date_list = test_input.split("/")
+        if (int(date_list[0]) > 12) and (int(date_list[2]) < 2000):
+            pass
+
+    converted_datetime = parser.parse(input_date, dayfirst=day_first)
+
+    return converted_datetime
 
 def delete_existing_budget_data_by_label(table, label):
     ''' Deletes data in the tbl_DATA_finmodelextract by tag
@@ -211,3 +238,6 @@ def create_consolidated_budget_data(label):
         session. add(row)
     session.commit()
     session.close()
+
+
+### ToDo: Headcount calcs in the actuals import misses new starters from current period
