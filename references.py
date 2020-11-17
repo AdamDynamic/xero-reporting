@@ -12,7 +12,7 @@ import datetime
 
 # Simple checks used to validate input before making a database request to check whether the date is in the database
 MODEL_START_DATE = datetime.datetime(year=2017, month=3, day=1) # The first period of valid data in the model
-AVAILABLE_PERIODS_YEARS = [2017,2018,2019,2020]
+AVAILABLE_PERIODS_YEARS = [2017,2018,2019,2020, 2021]
 AVAILABLE_PERIODS_MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12]
 
 ### Master Data Mappings
