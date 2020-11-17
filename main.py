@@ -203,7 +203,7 @@ def actuals_create_consol_table(year, month):
 
 
 @fin_reporting.command(help="Imports a flatfile of Budget data")
-@click.option('--overwrite', default=False, help="Overwrites previously imported data")
+@click.option('--overwrite', type=bool, default=False, help="True/False whether to overwrite previously imported data")
 def budget_get_data(overwrite):
     ''' Imports budget data in *.csv flatfile format
 
